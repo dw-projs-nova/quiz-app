@@ -1,0 +1,175 @@
+body {
+  min-height: 100vh;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+.hm-admin-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  padding: 0.65rem 1rem;
+  background: var(--bs-content-bg);
+  border-bottom: 1px solid var(--bs-content-border-color);
+  box-shadow: 0 0.25rem 0.8rem rgb(0 0 0 / 6%);
+}
+
+.hm-admin-navbar-inner {
+  gap: 1rem;
+}
+
+.hm-admin-navbar .navbar-brand {
+  color: var(--bs-emphasis-color);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.hm-admin-navbar .navbar-nav {
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.hm-admin-navbar .nav-link {
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--bs-secondary-color);
+}
+
+.hm-admin-navbar .nav-link:hover,
+.hm-admin-navbar .nav-link:focus {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-emphasis-color);
+}
+
+.hm-admin-navbar .navbar-toggler {
+  border-color: var(--bs-border-color);
+}
+
+.hm-admin-main {
+  max-width: 90rem;
+  padding-block: 2rem;
+}
+
+.hm-admin-main h1,
+.hm-admin-main h2,
+.hm-admin-main h3 {
+  color: var(--bs-emphasis-color);
+  font-weight: 650;
+}
+
+.hm-admin-main .table {
+  color: var(--bs-body-color);
+  background: var(--bs-content-bg);
+}
+
+.hm-admin-main .table thead th {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.hm-admin-main .table td,
+.hm-admin-main .table th {
+  border-color: var(--bs-border-color);
+  vertical-align: middle;
+}
+
+.hm-admin-main .form-control,
+.hm-admin-main .custom-select,
+.hm-admin-main select.form-control {
+  min-height: 2.5rem;
+  border-color: var(--bs-border-color);
+  border-radius: 0.55rem;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+.hm-admin-main textarea.form-control {
+  min-height: 7rem;
+}
+
+.hm-admin-main .btn {
+  border-radius: 0.55rem;
+  font-weight: 600;
+}
+
+.hm-admin-main .card,
+.hm-admin-main .panel,
+.hm-admin-main .well {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.8rem;
+  background: var(--bs-content-bg);
+  color: var(--bs-body-color);
+  box-shadow: 0 0.35rem 1.2rem rgb(0 0 0 / 5%);
+}
+
+.hm-admin-main .alert {
+  border-radius: 0.65rem;
+}
+
+.hm-admin-main .pagination .page-link {
+  border-color: var(--bs-border-color);
+  background: var(--bs-content-bg);
+  color: var(--bs-link-color);
+}
+
+.hm-admin-theme-picker {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.hm-admin-theme-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 1040;
+  display: grid;
+  min-width: 9rem;
+  padding: 0.35rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.7rem;
+  background: var(--bs-content-bg);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 14%);
+}
+
+.hm-admin-theme-menu[hidden] {
+  display: none;
+}
+
+.hm-admin-theme-menu button {
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--bs-body-color);
+  text-align: left;
+}
+
+.hm-admin-theme-menu button:hover,
+.hm-admin-theme-menu button:focus,
+.hm-admin-theme-menu button[aria-pressed="true"] {
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-emphasis-color);
+}
+
+@media (max-width: 991.98px) {
+  .hm-admin-navbar-inner {
+    flex-wrap: wrap;
+  }
+
+  .hm-admin-theme-picker {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .hm-admin-navbar .navbar-collapse {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .hm-admin-navbar .navbar-nav {
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit quiz" if quiz else "Create quiz" }} - Quiz App{% endblock %}
+
+{% block content %}
+<section class="container py-4">
+  <div class="mb-4">
+    <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+    <h1 class="h2 mt-2">{{ "Edit quiz" if quiz else "Create quiz" }}</h1>
+    <p class="text-body-secondary mb-0">Start with a title and an optional description. You can add questions next.</p>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="card">
+    <div class="card-body d-grid gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label class="form-label" for="title">Quiz title</label>
+        <input class="form-control" id="title" name="title" maxlength="200" required
+               value="{{ values.title }}">
+      </div>
+      <div>
+        <label class="form-label" for="description">Description <span class="text-body-secondary">(optional)</span></label>
+        <textarea class="form-control" id="description" name="description" rows="3"
+                  maxlength="10000">{{ values.description }}</textarea>
+      </div>
+      <div>
+        <button class="btn btn-primary" type="submit">{{ "Save changes" if quiz else "Create quiz" }}</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('main.instructor_quizzes') }}">Cancel</a>
+      </div>
+    </div>
+  </form>
+</section>
+{% endblock %}

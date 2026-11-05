@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz{% endblock %}
+
+
+{% block content %}
+<h1>Quiz Page</h1>
+
+<form method="POST">
+    <div>What is the largest US state by size?</h3>
+        <div class="options">
+            <input type="radio" class="option-btn" value="False">Texas</input>
+            <input type="radio" class="option-btn" value="False">New York</input>
+            <input type="radio" class="option-btn" value="False">California</input>
+            <input type="radio" class="option-btn" value="False">Alaska</input>
+        </div>
+    </div>
+        <div>What year did WWII start?</h3>
+        <div class="options">
+            <input type="radio" class="option-btn" value="False">1889</input>
+            <input type="radio" class="option-btn" value="False">1984</input>
+            <input type="radio" class="option-btn" value="True">1939</input>
+            <input type="radio" class="option-btn" value="False">1914</input>
+        </div>
+    </div>
+    </div>
+        <div>Which animal is the mascot of Dunwoody's E-sports team?</h3>
+        <div class="options">
+            <input type="radio" class="option-btn" value="False">Wolf</input>
+            <input type="radio" class="option-btn" value="True">Hawk</input>
+            <input type="radio" class="option-btn" value="False">Bear</input>
+            <input type="radio" class="option-btn" value="False">Eagle</input>
+        </div>
+    </div>
+    </div>
+        <div>If Jane is four times as old as her brother and she is 20 years old, how old will she be when she is twice as old?</h3>
+        <div class="options">
+            <input type="radio" class="option-btn" value="True">30</input>
+            <input type="radio" class="option-btn" value="False">34</input>
+            <input type="radio" class="option-btn" value="False">40</input>
+            <input type="radio" class="option-btn" value="False">36</input>
+        </div>
+    </div>
+    </div>
+        <div>What house was Harry Potter assigned?</h3>
+        <div class="options">
+            <input type="radio" class="option-btn" value="False">Slytherin</input>
+            <input type="radio" class="option-btn" value="False">Ravenclaw</input>
+            <input type="radio" class="option-btn" value="False">Hufflepuff</input>
+            <input type="radio" class="option-btn" value="True">Gryffindor</input>
+        </div>
+    </div>
+</form>
+
+{% endblock %}

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+            (() => {
+                "use strict";
+
+                const getStoredTheme = () => localStorage.getItem("theme");
+                const setStoredTheme = (theme) => localStorage.setItem("theme", theme);
+                const getPreferredTheme = () => {
+                    const storedTheme = getStoredTheme();
+                    if (storedTheme) {
+                        return storedTheme;
+                    }
+
+                    return window.matchMedia("(prefers-color-scheme: dark)").matches
+                        ? "dark"
+                        : "light";
+                };
+                const setTheme = (theme) => {
+                    const resolvedTheme =
+                        theme === "auto"
+                            ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                                ? "dark"
+                                : "light"
+                            : theme;
+                    document.documentElement.setAttribute("data-bs-theme", resolvedTheme);
+                };
+
+                setTheme(getPreferredTheme());
+
+                const showActiveTheme = (theme) => {
+                    const themeSwitcher = document.querySelector("#bd-theme");
+                    if (!themeSwitcher) {
+                        return;
+                    }
+
+                    const themeNames = {
+                        light: "Light",
+                        dark: "Dark",
+                        auto: "System",
+                    };
+                    const themeIcons = {
+                        light: "fa-sun-o",
+                        dark: "fa-moon-o",
+                        auto: "fa-adjust",
+                    };
+
+                    themeSwitcher.querySelectorAll("[data-bs-theme-value]").forEach((button) => {
+                        const isActive = button.dataset.bsThemeValue === theme;
+                        button.classList.toggle("active", isActive);
+                        button.setAttribute("aria-pressed", String(isActive));
+                    });
+                    themeSwitcher.querySelector(".theme-picker-label").textContent = themeNames[theme];
+                    themeSwitcher.querySelector(".theme-picker-current-icon").className =
+                        `fa ${themeIcons[theme]} theme-picker-current-icon`;
+                    themeSwitcher.querySelector(".theme-picker-toggle").setAttribute(
+                        "aria-label",
+                        `Color theme, currently ${themeNames[theme]}`
+                    );
+                };
+
+                window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+                    const storedTheme = getStoredTheme();
+                    if (storedTheme !== "light" && storedTheme !== "dark") {
+                        const theme = getPreferredTheme();
+                        setTheme(theme);
+                        showActiveTheme(theme);
+                    }
+                });
+
+                window.addEventListener("DOMContentLoaded", () => {
+                    showActiveTheme(getPreferredTheme());
+
+                    document.querySelectorAll("[data-bs-theme-value]").forEach((button) => {
+                        button.addEventListener("click", () => {
+                            const theme = button.dataset.bsThemeValue;
+                            setStoredTheme(theme);
+                            setTheme(theme);
+                            showActiveTheme(theme);
+                        });
+                    });
+                });
+            })();
+        </script>
+        <title>{% block title %}Quiz App{% endblock %}</title>
+
+        <!-- Halfmoon CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/halfmoon@2.0.2/css/halfmoon.min.css" rel="stylesheet" integrity="sha256-RjeFzczeuZHCyS+Gvz+kleETzBF/o84ZRHukze/yv6o=" crossorigin="anonymous">
+
+        <!-- Halfmoon modern core theme -->
+        <link href="https://cdn.jsdelivr.net/npm/halfmoon@2.0.2/css/cores/halfmoon.modern.css" rel="stylesheet" integrity="sha256-DD6elX+jPmbFYPsGvzodUv2+9FHkxHlVtQi0/RJVULs=" crossorigin="anonymous">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
+
+        <!-- font awesome  4.7.0 -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  </head>
+  <body>
+      {% block navigation %}
+      <nav class="navbar navbar-expand-lg"
+           style="background-color: var(--bs-content-bg); border-bottom: var(--bs-border-width) solid var(--bs-content-border-color);"
+           aria-label="Main navigation">
+        <div class="container">
+          <a class="navbar-brand" href="{{ url_for('main.account') if current_user else url_for('main.login') }}">
+            Quiz App
+          </a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                  data-bs-target="#main-navigation" aria-controls="main-navigation"
+                  aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+
+          <div class="collapse navbar-collapse" id="main-navigation">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+              {% if current_user %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint == 'main.account' %} active{% endif %}"
+                   {% if request.endpoint == 'main.account' %}aria-current="page"{% endif %}
+                   href="{{ url_for('main.account') }}">Account</a>
+              </li>
+              {% if has_permission('quiz.manage_own') %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint and request.endpoint.startswith('main.instructor_') or request.endpoint in ['main.create_quiz', 'main.edit_quiz', 'main.create_quiz_question'] %} active{% endif %}"
+                   href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+              </li>
+              {% endif %}
+              {% if has_permission('users.manage') %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint == 'main.admin_users' %} active{% endif %}"
+                   {% if request.endpoint == 'main.admin_users' %}aria-current="page"{% endif %}
+                   href="{{ url_for('main.admin_users') }}">Manage users</a>
+              </li>
+              {% endif %}
+              {% if has_permission('quiz.manage_all') %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.endpoint == 'quiz_admin.index' or request.endpoint and request.endpoint.startswith(('admin_users_data.', 'admin_quizzes_data.', 'admin_questions_data.', 'admin_attempts_data.', 'admin_answers_data.')) %} active{% endif %}"
+                   {% if request.endpoint == 'quiz_admin.index' %}aria-current="page"{% endif %}
+                   href="{{ url_for('quiz_admin.index') }}">Admin dashboard</a>
+              </li>
+              {% endif %}
+              {% endif %}
+            </ul>
+
+            <ul class="navbar-nav align-items-lg-center">
+              {% if current_user %}
+              <li class="nav-item dropdown">
+                <button class="nav-link dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                  <span class="account-avatar" aria-hidden="true">{{ current_user.display_name[:1]|upper }}</span>
+                  <span>{{ current_user.display_name }}</span>
+                  <span class="badge text-bg-secondary">{{ role_labels.get(current_user.role, current_user.role) }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  {% if has_permission('quiz.manage_all') %}
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('quiz_admin.index') }}">Admin dashboard</a>
+                  </li>
+                  {% endif %}
+                  <li>
+                    <form method="post" action="{{ url_for('main.logout') }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="dropdown-item" type="submit">Sign out</button>
+                    </form>
+                  </li>
+                </ul>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+
+          <div class="site-nav-actions">
+            {% if not current_user %}
+            <a class="btn btn-primary site-sign-in" href="{{ url_for('main.login') }}">Sign in</a>
+            {% endif %}
+            <div class="dropdown theme-picker" id="bd-theme">
+            <button class="btn btn-outline-secondary dropdown-toggle theme-picker-toggle"
+                    type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    aria-label="Color theme">
+              <i class="fa fa-adjust theme-picker-current-icon" aria-hidden="true"></i>
+              <span class="theme-picker-label">System</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end theme-picker-menu">
+              <span class="theme-picker-heading">Appearance</span>
+              <button class="dropdown-item theme-picker-option" type="button"
+                      data-bs-theme-value="light" aria-pressed="false">
+                <i class="fa fa-sun-o theme-picker-option-icon" aria-hidden="true"></i>
+                <span class="theme-picker-option-copy">
+                  <strong>Light</strong>
+                  <small>Bright and clear</small>
+                </span>
+                <i class="fa fa-check theme-picker-check" aria-hidden="true"></i>
+              </button>
+              <button class="dropdown-item theme-picker-option" type="button"
+                      data-bs-theme-value="dark" aria-pressed="false">
+                <i class="fa fa-moon-o theme-picker-option-icon" aria-hidden="true"></i>
+                <span class="theme-picker-option-copy">
+                  <strong>Dark</strong>
+                  <small>Easy on the eyes</small>
+                </span>
+                <i class="fa fa-check theme-picker-check" aria-hidden="true"></i>
+              </button>
+              <button class="dropdown-item theme-picker-option" type="button"
+                      data-bs-theme-value="auto" aria-pressed="false">
+                <i class="fa fa-adjust theme-picker-option-icon" aria-hidden="true"></i>
+                <span class="theme-picker-option-copy">
+                  <strong>System</strong>
+                  <small>Use device setting</small>
+                </span>
+                <i class="fa fa-check theme-picker-check" aria-hidden="true"></i>
+              </button>
+            </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+      {% endblock %}
+    <main>{% block content %}{% endblock %}</main>
+    {% block scripts %}
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha256-CDOy6cOibCWEdsRiZuaHf8dSGGJRYuBGC+mjoJimHGw=" crossorigin="anonymous"></script>
+    {% endblock %}
+  </body>
+</html>

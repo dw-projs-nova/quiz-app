@@ -1,0 +1,114 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ admin_view.admin.name }}{% if admin_view.name %} - {{ admin_view.name }}{% endif %}{% endblock %}
+
+{% block head_css %}
+  <link href="https://cdn.jsdelivr.net/npm/halfmoon@2.0.2/css/halfmoon.min.css" rel="stylesheet" integrity="sha256-RjeFzczeuZHCyS+Gvz+kleETzBF/o84ZRHukze/yv6o=" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/halfmoon@2.0.2/css/cores/halfmoon.modern.css" rel="stylesheet" integrity="sha256-DD6elX+jPmbFYPsGvzodUv2+9FHkxHlVtQi0/RJVULs=" crossorigin="anonymous">
+  <link href="{{ admin_static.url(filename='admin/css/bootstrap4/admin.css', v='1.1.1') }}" rel="stylesheet" {{ admin_csp_nonce_attribute }}>
+  <link href="{{ admin_static.url(filename='bootstrap/bootstrap4/css/font-awesome.min.css', v='4.7.0') }}" rel="stylesheet" {{ admin_csp_nonce_attribute }}>
+  <link href="{{ url_for('static', filename='styles/admin-halfmoon.css') }}" rel="stylesheet">
+  {% if admin_view.extra_css %}
+    {% for css_url in admin_view.extra_css %}
+      <link href="{{ css_url }}" rel="stylesheet" {{ admin_csp_nonce_attribute }}>
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block head %}
+  <script>
+    (() => {
+      const getTheme = () => localStorage.getItem("theme") || "auto";
+      const resolveTheme = (theme) => theme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : theme;
+      document.documentElement.setAttribute("data-bs-theme", resolveTheme(getTheme()));
+      window.addEventListener("DOMContentLoaded", () => {
+        const themeMenu = document.querySelector("#admin-theme-menu");
+        const themeButton = document.querySelector("#admin-theme-toggle");
+        const themeLabel = document.querySelector("#admin-theme-label");
+        const themeNames = { light: "Light", dark: "Dark", auto: "System" };
+        const applyTheme = (theme) => {
+          localStorage.setItem("theme", theme);
+          document.documentElement.setAttribute("data-bs-theme", resolveTheme(theme));
+          themeLabel.textContent = themeNames[theme];
+          document.querySelectorAll("[data-admin-theme]").forEach((option) => {
+            option.setAttribute("aria-pressed", String(option.dataset.adminTheme === theme));
+          });
+        };
+        themeButton.addEventListener("click", () => {
+          const isExpanded = themeButton.getAttribute("aria-expanded") === "true";
+          themeButton.setAttribute("aria-expanded", String(!isExpanded));
+          themeMenu.hidden = isExpanded;
+        });
+        document.querySelectorAll("[data-admin-theme]").forEach((option) => {
+          option.addEventListener("click", () => {
+            applyTheme(option.dataset.adminTheme);
+            themeButton.setAttribute("aria-expanded", "false");
+            themeMenu.hidden = true;
+          });
+        });
+        const storedTheme = getTheme();
+        applyTheme(storedTheme);
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+          if (getTheme() === "auto") {
+            document.documentElement.setAttribute("data-bs-theme", resolveTheme("auto"));
+          }
+        });
+      });
+    })();
+  </script>
+{% endblock %}
+
+{% block page_body %}
+  <nav class="navbar navbar-expand-lg hm-admin-navbar" aria-label="Admin navigation">
+    <div class="container-fluid hm-admin-navbar-inner">
+      <a class="navbar-brand" href="{{ admin_view.admin.url }}">{{ admin_view.admin.name }}</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#hm-admin-navigation"
+              aria-controls="hm-admin-navigation" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="hm-admin-navigation">
+        {% block main_menu %}
+          <ul class="nav navbar-nav mr-auto">
+            {{ layout.menu() }}
+          </ul>
+        {% endblock %}
+        {% block menu_links %}
+          <ul class="nav navbar-nav navbar-right">
+            {{ layout.menu_links() }}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('main.account') }}">Back to Quiz App</a>
+            </li>
+          </ul>
+        {% endblock %}
+      </div>
+      <div class="hm-admin-theme-picker">
+        <button class="btn btn-outline-secondary" id="admin-theme-toggle" type="button"
+                aria-expanded="false" aria-controls="admin-theme-menu">
+          Appearance: <span id="admin-theme-label">System</span>
+        </button>
+        <div class="hm-admin-theme-menu" id="admin-theme-menu" hidden>
+          <button type="button" data-admin-theme="light" aria-pressed="false">Light</button>
+          <button type="button" data-admin-theme="dark" aria-pressed="false">Dark</button>
+          <button type="button" data-admin-theme="auto" aria-pressed="false">System</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid hm-admin-main">
+    {% block messages %}
+      {{ layout.messages() }}
+    {% endblock %}
+
+    {% set render_ctx = h.resolve_ctx() %}
+
+    {% block body %}{% endblock %}
+  </main>
+{% endblock %}
+
+{% block tail_js %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha256-CDOy6cOibCWEdsRiZuaHf8dSGGJRYuBGC+mjoJimHGw=" crossorigin="anonymous"></script>
+{% endblock %}

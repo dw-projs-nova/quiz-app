@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}{{ quiz.title }} - Quiz App{% endblock %}
+
+{% block content %}
+<section class="container py-4">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+      <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+      <h1 class="h2 mt-2 mb-1">{{ quiz.title }}</h1>
+      {% if quiz.description %}
+      <p class="text-body-secondary mb-0">{{ quiz.description }}</p>
+      {% endif %}
+    </div>
+    <a class="btn btn-outline-secondary"
+       href="{{ url_for('main.edit_quiz', quiz_id=quiz.id) }}">Edit quiz details</a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-7">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h4">Questions</h2>
+          {% if quiz.questions %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Question</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for question in quiz.questions %}
+                <tr>
+                  <td>{{ question.position }}</td>
+                  <td>
+                    {{ question.prompt }}
+                    {% if question.options %}
+                    <ul class="small text-body-secondary mb-0 mt-1">
+                      {% for option in question.options %}
+                      <li>
+                        {{ option.text }}{% if option.is_correct %} <strong>(correct answer)</strong>{% endif %}
+                      </li>
+                      {% endfor %}
+                    </ul>
+                    {% endif %}
+                  </td>
+                  <td>{{ question_types[question.question_type] }}</td>
+                  <td>{{ question.points }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-body-secondary mb-0">No questions yet. Add the first one using the form.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+      <form class="card" method="post"
+            action="{{ url_for('main.create_quiz_question', quiz_id=quiz.id) }}">
+        <div class="card-body d-grid gap-3">
+          <h2 class="h4 mb-0">Add a question</h2>
+          {% if error %}
+          <div class="alert alert-danger mb-0" role="alert">{{ error }}</div>
+          {% endif %}
+
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div>
+            <label class="form-label" for="prompt">Question</label>
+            <textarea class="form-control" id="prompt" name="prompt" rows="3" required
+                      maxlength="5000">{{ question_values.prompt }}</textarea>
+          </div>
+
+          <div>
+            <label class="form-label" for="question_type">Answer type</label>
+            <select class="form-select" id="question_type" name="question_type">
+              {% for value, label in question_types.items() %}
+              <option value="{{ value }}"
+                      {% if question_values.question_type == value %}selected{% endif %}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div id="multiple-choice-help">
+            <label class="form-label" for="options">Answer options</label>
+            <p class="form-text mt-0">
+              An option is one answer the student can choose for this question. Enter one choice per line.
+              Example: “Red”, “Blue”, “Green”. Add at least two.
+            </p>
+            <textarea class="form-control" id="options" name="options" rows="4"
+                      placeholder="Red&#10;Blue&#10;Green">{{ question_values.options }}</textarea>
+            <label class="form-label mt-2" for="correct_option">Correct option number</label>
+            <input class="form-control" id="correct_option" name="correct_option" type="number"
+                   min="1" value="{{ question_values.correct_option }}">
+            <div class="form-text">Number options from top to bottom, starting at 1.</div>
+          </div>
+
+          <div id="true-false-help" hidden>
+            <label class="form-label" for="true-false-answer">Correct answer</label>
+            <select class="form-select" id="true-false-answer" name="true_false_answer">
+              <option value="1" {% if question_values.correct_option == "1" %}selected{% endif %}>True</option>
+              <option value="2" {% if question_values.correct_option == "2" %}selected{% endif %}>False</option>
+            </select>
+            <div class="form-text">Students will be offered True and False automatically.</div>
+          </div>
+
+          <div id="short-answer-help" hidden>
+            <p class="form-text mb-0">
+              Students type their own response. There are no answer options; responses will need to be reviewed by an instructor.
+            </p>
+          </div>
+
+          <div>
+            <label class="form-label" for="points">Points</label>
+            <input class="form-control" id="points" name="points" type="number"
+                   min="0.01" step="0.01" required value="{{ question_values.points }}">
+          </div>
+
+          <button class="btn btn-primary" type="submit">Add question</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (() => {
+    const typePicker = document.querySelector("#question_type");
+    const sections = {
+      single_choice: document.querySelector("#multiple-choice-help"),
+      true_false: document.querySelector("#true-false-help"),
+      short_answer: document.querySelector("#short-answer-help"),
+    };
+    const updateQuestionType = () => {
+      Object.entries(sections).forEach(([type, section]) => {
+        section.hidden = type !== typePicker.value;
+      });
+    };
+    typePicker.addEventListener("change", updateQuestionType);
+    updateQuestionType();
+  })();
+</script>
+{% endblock %}
