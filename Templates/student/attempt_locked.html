@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Attempt locked · {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="student-locked-card instructor-panel" role="status">
+    <h1>{{ quiz.title }}</h1>
+    <h2>This attempt is locked</h2>
+    <p>{{ lock_reason }}</p>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.student_dashboard') }}">Back to my learning</a>
+  </div>
+</section>
+{% endblock %}

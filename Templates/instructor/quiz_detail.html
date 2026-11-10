@@ -1,135 +1,365 @@
 {% extends "base.html" %}
 
-{% block title %}{{ quiz.title }} - Quiz App{% endblock %}
+{% block title %}{{ quiz.title }} · Instructor · Quiz App{% endblock %}
 
 {% block content %}
-<section class="container py-4">
-  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
-    <div>
-      <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
-      <h1 class="h2 mt-2 mb-1">{{ quiz.title }}</h1>
-      {% if quiz.description %}
-      <p class="text-body-secondary mb-0">{{ quiz.description }}</p>
-      {% endif %}
-    </div>
-    <a class="btn btn-outline-secondary"
-       href="{{ url_for('main.edit_quiz', quiz_id=quiz.id) }}">Edit quiz details</a>
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb">
+    <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <span>{{ quiz.title }}</span>
   </div>
 
-  <div class="row g-4">
-    <div class="col-12 col-lg-7">
-      <div class="card h-100">
-        <div class="card-body">
-          <h2 class="h4">Questions</h2>
-          {% if quiz.questions %}
-          <div class="table-responsive">
-            <table class="table align-middle">
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Question</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for question in quiz.questions %}
-                <tr>
-                  <td>{{ question.position }}</td>
-                  <td>
-                    {{ question.prompt }}
-                    {% if question.options %}
-                    <ul class="small text-body-secondary mb-0 mt-1">
-                      {% for option in question.options %}
-                      <li>
-                        {{ option.text }}{% if option.is_correct %} <strong>(correct answer)</strong>{% endif %}
-                      </li>
-                      {% endfor %}
-                    </ul>
-                    {% endif %}
-                  </td>
-                  <td>{{ question_types[question.question_type] }}</td>
-                  <td>{{ question.points }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <p class="text-body-secondary mb-0">No questions yet. Add the first one using the form.</p>
-          {% endif %}
-        </div>
+  <header class="quiz-management-header instructor-panel">
+    <div class="quiz-management-copy">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <p class="instructor-eyebrow mb-0">QUIZ WORKSPACE</p>
+        <span class="instructor-status {{ 'is-published' if quiz.is_published else 'is-draft' }}">{{ "Published" if quiz.is_published else "Draft" }}</span>
+      </div>
+      <h1>{{ quiz.title }}</h1>
+      <p class="text-body-secondary">{{ quiz.description or "Add a description to help students understand this quiz." }}</p>
+      <div class="quiz-meta-line">
+        <span><i class="fa fa-list-ol" aria-hidden="true"></i> {{ quiz.questions|length }} questions</span>
+        <span><i class="fa fa-star-o" aria-hidden="true"></i> {{ total_points }} points</span>
+        <span><i class="fa fa-clock-o" aria-hidden="true"></i> {{ (quiz.time_limit_seconds // 60 ~ " min") if quiz.time_limit_seconds else "No time limit" }}</span>
+        <span><i class="fa fa-users" aria-hidden="true"></i> {{ attempt_count }} attempts</span>
       </div>
     </div>
+    <div class="quiz-management-actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.edit_quiz', quiz_id=quiz.id) }}"><i class="fa fa-pencil me-1" aria-hidden="true"></i> Edit details</a>
+    </div>
+  </header>
 
-    <div class="col-12 col-lg-5">
-      <form class="card" method="post"
-            action="{{ url_for('main.create_quiz_question', quiz_id=quiz.id) }}">
-        <div class="card-body d-grid gap-3">
-          <h2 class="h4 mb-0">Add a question</h2>
-          {% if error %}
-          <div class="alert alert-danger mb-0" role="alert">{{ error }}</div>
+  <nav class="instructor-subnav" aria-label="Quiz workspace">
+    <a class="active" href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}" aria-current="page">Questions</a>
+    <a href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}">Attempts <span class="subnav-count">{{ attempt_count }}</span></a>
+    <a href="{{ url_for('main.quiz_report', quiz_id=quiz.id) }}">Reports</a>
+  </nav>
+
+  <div class="quiz-builder-layout">
+    <section class="quiz-question-column">
+      <div class="instructor-panel" id="questions">
+        <div class="instructor-panel-heading">
+          <div><h2>Questions</h2><p>Review and manage the content in your quiz.</p></div>
+          <div class="d-flex align-items-center gap-2">
+            <form method="post" action="{{ url_for('main.fix_quiz_issues', quiz_id=quiz.id) }}"
+                  title="{% if quiz.is_published %}Unpublish this quiz to repair numbering.{% elif active_attempt_count %}Wait for active attempts to finish before repairing numbering.{% else %}Renumber questions and sections in their current order.{% endif %}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit"
+                      {% if question_content_locked %}disabled{% endif %}>
+                <i class="fa fa-wrench me-1" aria-hidden="true"></i>Fix any issues
+              </button>
+            </form>
+            <span class="question-count-pill">{{ quiz.questions|length }}</span>
+          </div>
+        </div>
+        {% if attempt_count and not question_content_locked %}
+        <div class="instructor-notice">
+          <i class="fa fa-info-circle" aria-hidden="true"></i>
+          <span>Changes may affect how completed attempts are displayed. Questions with recorded responses cannot be deleted, and answer choices selected in prior attempts cannot be removed.</span>
+        </div>
+        {% endif %}
+        <div class="quiz-sections-editor">
+          <div class="quiz-sections-heading">
+            <div><h3>Sections</h3><p>Group questions into parts, units, or exam sections.</p></div>
+          </div>
+          {% if quiz.sections %}
+          <div class="quiz-section-admin-list">
+            {% for section in quiz.sections %}
+            <div class="quiz-section-admin-item">
+              <span><b>{{ section.position }}</b>{{ section.title }}</span>
+              {% if not question_content_locked %}
+              <form method="post" action="{{ url_for('main.delete_quiz_section', quiz_id=quiz.id, section_id=section.id) }}"
+                    onsubmit="return confirm('Delete this section? Its questions will remain in the quiz without a section.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Remove section</button>
+              </form>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
           {% endif %}
+          {% if not question_content_locked %}
+          <form class="quiz-section-create" method="post" action="{{ url_for('main.create_quiz_section', quiz_id=quiz.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="visually-hidden" for="section-title">Section title</label>
+            <input class="form-control" id="section-title" name="title" maxlength="120" required
+                   placeholder="e.g. Part 1 · Cell structure">
+            <button class="btn btn-sm btn-outline-primary" type="submit">Add section</button>
+          </form>
+          {% elif question_content_locked %}
+          <p class="form-text mb-0">
+            {% if quiz.is_published %}Unpublish this quiz to edit its sections.
+            {% else %}Sections are unavailable while {{ active_attempt_count }} active attempt{{ "" if active_attempt_count == 1 else "s" }} {{ "remains" if active_attempt_count == 1 else "remain" }}.{% endif %}
+          </p>
+          {% endif %}
+        </div>
+        {% if quiz.questions %}
+          <div class="quiz-question-list">
+            {% for section, questions in question_sections %}
+            {% if section %}
+            <div class="quiz-question-section-heading">
+              <span>SECTION {{ section.position }}</span>
+              <h3>{{ section.title }}</h3>
+            </div>
+            {% endif %}
+            {% for question in questions %}
+            <article class="quiz-question-card">
+              <span class="question-number">{{ question.position }}</span>
+              <div class="quiz-question-main">
+                <div class="quiz-question-heading">
+                  <h3>{{ question.prompt }}</h3>
+                  <div class="quiz-question-tools">
+                    {% if not question_content_locked %}
+                    <form class="question-reorder-controls" method="post" action="{{ url_for('main.move_quiz_question', quiz_id=quiz.id, question_id=question.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-sm btn-outline-secondary" type="submit" name="direction" value="up" aria-label="Move question {{ question.position }} up" {% if loop.first %}disabled{% endif %}><i class="fa fa-arrow-up" aria-hidden="true"></i></button>
+                      <button class="btn btn-sm btn-outline-secondary" type="submit" name="direction" value="down" aria-label="Move question {{ question.position }} down" {% if loop.last %}disabled{% endif %}><i class="fa fa-arrow-down" aria-hidden="true"></i></button>
+                    </form>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.edit_quiz_question', quiz_id=quiz.id, question_id=question.id) }}">Edit</a>
+                    {% if question.id not in questions_with_answers %}
+                    <form method="post" action="{{ url_for('main.delete_quiz_question', quiz_id=quiz.id, question_id=question.id) }}"
+                          onsubmit="return confirm('Delete this question? This cannot be undone.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    </form>
+                    {% else %}
+                    <span class="text-body-secondary small">Has responses</span>
+                    {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="question-meta">
+                  <span>{{ question_types[question.question_type] }}</span>
+                  <span>{{ question.points }} points</span>
+                  {% if question.section_assignment %}<span>{{ question.section_assignment.section.title }}</span>{% endif %}
+                </div>
+                {% if question.options %}
+                <ul class="question-option-list">
+                  {% for option in question.options %}
+                  <li class="{{ 'is-correct' if option.is_correct else '' }}">
+                    <span class="option-radio" aria-hidden="true"></span>
+                    {{ option.text }}
+                    {% if option.is_correct %}<span class="correct-answer-label">Correct answer</span>{% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% elif question.question_type == "short_answer" and question.accepted_answers %}
+                <p class="question-note">{{ question.accepted_answers|length }} accepted response{{ "" if question.accepted_answers|length == 1 else "s" }} configured for automatic grading.</p>
+                {% else %}
+                <p class="question-note">Students type their own response. {{ "Responses are graded manually." if not question.accepted_answers else "Accepted responses are graded automatically." }}</p>
+                {% endif %}
+              </div>
+            </article>
+            {% endfor %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="instructor-empty instructor-empty-compact">
+            <span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-list-ol"></i></span>
+            <h3>Your quiz is ready for questions</h3>
+            <p class="text-body-secondary">Add at least one question before publishing.</p>
+          </div>
+        {% endif %}
+      </div>
 
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-          <div>
-            <label class="form-label" for="prompt">Question</label>
+      {% if not question_content_locked %}
+      <form id="question-builder" class="instructor-panel question-editor" method="post"
+            action="{{ url_for('main.create_quiz_question', quiz_id=quiz.id) }}">
+        <div class="instructor-panel-heading">
+          <div><h2>Add a question</h2><p>Build your quiz with a few clear, focused prompts.</p></div>
+        </div>
+        {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="question-editor-grid">
+          <div class="question-editor-prompt">
+            <label class="form-label" for="prompt">Question prompt</label>
             <textarea class="form-control" id="prompt" name="prompt" rows="3" required
                       maxlength="5000">{{ question_values.prompt }}</textarea>
           </div>
-
           <div>
             <label class="form-label" for="question_type">Answer type</label>
             <select class="form-select" id="question_type" name="question_type">
               {% for value, label in question_types.items() %}
-              <option value="{{ value }}"
-                      {% if question_values.question_type == value %}selected{% endif %}>
-                {{ label }}
-              </option>
+              <option value="{{ value }}" {% if question_values.question_type == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
-
-          <div id="multiple-choice-help">
-            <label class="form-label" for="options">Answer options</label>
-            <p class="form-text mt-0">
-              An option is one answer the student can choose for this question. Enter one choice per line.
-              Example: “Red”, “Blue”, “Green”. Add at least two.
-            </p>
-            <textarea class="form-control" id="options" name="options" rows="4"
-                      placeholder="Red&#10;Blue&#10;Green">{{ question_values.options }}</textarea>
-            <label class="form-label mt-2" for="correct_option">Correct option number</label>
-            <input class="form-control" id="correct_option" name="correct_option" type="number"
-                   min="1" value="{{ question_values.correct_option }}">
-            <div class="form-text">Number options from top to bottom, starting at 1.</div>
-          </div>
-
-          <div id="true-false-help" hidden>
-            <label class="form-label" for="true-false-answer">Correct answer</label>
-            <select class="form-select" id="true-false-answer" name="true_false_answer">
-              <option value="1" {% if question_values.correct_option == "1" %}selected{% endif %}>True</option>
-              <option value="2" {% if question_values.correct_option == "2" %}selected{% endif %}>False</option>
-            </select>
-            <div class="form-text">Students will be offered True and False automatically.</div>
-          </div>
-
-          <div id="short-answer-help" hidden>
-            <p class="form-text mb-0">
-              Students type their own response. There are no answer options; responses will need to be reviewed by an instructor.
-            </p>
-          </div>
-
           <div>
             <label class="form-label" for="points">Points</label>
-            <input class="form-control" id="points" name="points" type="number"
-                   min="0.01" step="0.01" required value="{{ question_values.points }}">
+            <input class="form-control" id="points" name="points" type="number" min="0.01"
+                   max="999999.99" step="0.01" required value="{{ question_values.points }}">
           </div>
+          <div>
+            <label class="form-label" for="section_id">Section <span class="text-body-secondary">(optional)</span></label>
+            <select class="form-select" id="section_id" name="section_id">
+              <option value="">No section</option>
+              {% for section in quiz.sections %}
+              <option value="{{ section.id }}" {% if question_values.section_id == section.id|string %}selected{% endif %}>{{ section.position }}. {{ section.title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
 
-          <button class="btn btn-primary" type="submit">Add question</button>
+        <div id="multiple-choice-help" class="question-type-panel">
+          <label class="form-label" for="options">Answer choices</label>
+          <p class="form-text mt-0">An option is one answer the student can choose for this question. Enter one choice per line and select the correct answer.</p>
+          <textarea class="form-control" id="options" name="options" rows="4"
+                    placeholder="Red&#10;Blue&#10;Green">{{ question_values.options }}</textarea>
+          <div class="question-correct-picker">
+            <label class="form-label" for="correct_option">Correct answer</label>
+            <select class="form-select" id="correct_option" name="correct_option"
+                    data-selected-option="{{ question_values.correct_option }}"></select>
+          </div>
+        </div>
+        <div id="true-false-help" class="question-type-panel" hidden>
+          <label class="form-label" for="true-false-answer">Correct answer</label>
+          <select class="form-select" id="true-false-answer" name="true_false_answer">
+            <option value="1" {% if question_values.correct_option == "1" %}selected{% endif %}>True</option>
+            <option value="2" {% if question_values.correct_option == "2" %}selected{% endif %}>False</option>
+          </select>
+          <div class="form-text">The True and False choices are added automatically.</div>
+        </div>
+        <div id="short-answer-help" class="question-type-panel" hidden>
+          <label class="form-label" for="accepted_answers">Accepted answers <span class="text-body-secondary">(optional)</span></label>
+          <p class="form-text mt-0">Enter one correct response per line. Matching ignores capitalization and extra spaces. Leave blank to grade responses manually.</p>
+          <textarea class="form-control" id="accepted_answers" name="accepted_answers" rows="3"
+                    placeholder="mitochondrion&#10;mitochondria">{{ question_values.accepted_answers }}</textarea>
+        </div>
+        <aside class="question-preview-card" aria-live="polite">
+          <div class="question-preview-heading"><span>LIVE PREVIEW</span><strong id="preview-points">1 point</strong></div>
+          <p id="preview-prompt">Your question will appear here.</p>
+          <div id="preview-options" class="question-preview-options"></div>
+          <p id="preview-answer-note" class="question-preview-note"></p>
+        </aside>
+        <div class="question-editor-footer">
+          <span class="text-body-secondary small">You can edit questions while this quiz is unpublished and no attempts are in progress.</span>
+          <button class="btn btn-primary" type="submit"><i class="fa fa-plus me-1" aria-hidden="true"></i> Add question</button>
         </div>
       </form>
-    </div>
+      {% else %}
+      <div class="instructor-notice">
+        <i class="fa fa-lock" aria-hidden="true"></i>
+        <span>
+          {% if quiz.is_published %}
+          Unpublish this quiz to edit question content.
+          {% else %}
+          Question content is locked while {{ active_attempt_count }} active attempt{{ "" if active_attempt_count == 1 else "s" }} {{ "remains" if active_attempt_count == 1 else "remain" }}. You can edit again when all active attempts are submitted.
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="quiz-sidebar">
+      <section class="instructor-panel">
+        <div class="instructor-panel-heading"><div><h2>Quiz actions</h2><p>Manage delivery and review activity.</p></div></div>
+        <div class="quiz-action-list">
+          <a href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}"><i class="fa fa-inbox" aria-hidden="true"></i><span><strong>View attempts</strong><small>Review student submissions</small></span><i class="fa fa-angle-right" aria-hidden="true"></i></a>
+          <a href="{{ url_for('main.quiz_report', quiz_id=quiz.id) }}"><i class="fa fa-bar-chart" aria-hidden="true"></i><span><strong>Quiz report</strong><small>See summary and question results</small></span><i class="fa fa-angle-right" aria-hidden="true"></i></a>
+          <a href="{{ url_for('main.edit_quiz', quiz_id=quiz.id) }}"><i class="fa fa-cog" aria-hidden="true"></i><span><strong>Quiz settings</strong><small>Title, time, and attempts</small></span><i class="fa fa-angle-right" aria-hidden="true"></i></a>
+        </div>
+      </section>
+      <section class="instructor-panel quiz-assignment-panel">
+        <div class="instructor-panel-heading">
+          <div><h2>Quiz access</h2><p>Choose classes or students who can take this quiz.</p></div>
+        </div>
+        {% if not quiz.is_published %}
+        <p class="form-text">Assignments can be set up now, but students will not see this quiz until it is published.</p>
+        {% endif %}
+        <form class="quiz-assignment-form" method="post"
+              action="{{ url_for('main.manage_quiz_assignments', quiz_id=quiz.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="assign_class">
+          <label class="form-label" for="assignment-class">Assign to a class</label>
+          <div class="d-flex gap-2">
+            <select class="form-select" id="assignment-class" name="class_id" required>
+              <option value="">Choose a class</option>
+              {% for classroom in assignment_classes %}
+              <option value="{{ classroom.id }}">{{ classroom.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-primary text-nowrap" type="submit" {% if not assignment_classes %}disabled{% endif %}>Assign to class</button>
+          </div>
+          {% if not assignment_classes %}
+          <p class="form-text mb-0">Create a class before assigning students.</p>
+          {% endif %}
+        </form>
+        {% if quiz.class_assignments %}
+        <div class="quiz-assignment-list">
+          <span class="quiz-assignment-label">Assigned classes</span>
+          {% for assignment in quiz.class_assignments %}
+          <div class="quiz-assignment-item">
+            <span><strong>{{ assignment.class_group.name }}</strong><small>All enrolled students · {{ "Published" if quiz.is_published else "Draft" }}</small></span>
+            <form method="post" action="{{ url_for('main.manage_quiz_assignments', quiz_id=quiz.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="remove_class">
+              <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Remove {{ quiz.title }} from {{ assignment.class_group.name }}">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <form class="quiz-assignment-form" method="post"
+              action="{{ url_for('main.manage_quiz_assignments', quiz_id=quiz.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="assign_student">
+          <label class="form-label" for="assignment-student">Assign to a student</label>
+          <div class="d-flex gap-2">
+            <select class="form-select" id="assignment-student" name="student_id" required>
+              <option value="">Choose a student</option>
+              {% for student in assignment_students %}
+              <option value="{{ student.id }}">{{ student.display_name }} · {{ student.email }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-outline-primary text-nowrap" type="submit" {% if not assignment_students %}disabled{% endif %}>Assign to student</button>
+          </div>
+          {% if not assignment_students %}
+          <p class="form-text mb-0">Students appear here after joining one of your classes.</p>
+          {% endif %}
+        </form>
+        {% if individual_assignments %}
+        <div class="quiz-assignment-list">
+          <span class="quiz-assignment-label">Individually assigned</span>
+          {% for assignment in individual_assignments %}
+          <div class="quiz-assignment-item">
+            <span><strong>{{ assignment.student.display_name }}</strong><small>{{ assignment.student.email }}</small></span>
+            <form method="post" action="{{ url_for('main.manage_quiz_assignments', quiz_id=quiz.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="remove_student">
+              <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Remove assignment for {{ assignment.student.display_name }}">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
+      <section class="instructor-panel quiz-publish-panel">
+        <span class="publish-status-icon {{ 'is-live' if quiz.is_published else '' }}" aria-hidden="true"><i class="fa {{ 'fa-check' if quiz.is_published else 'fa-paper-plane-o' }}"></i></span>
+        <h2>{{ "Quiz is published" if quiz.is_published else "Ready to publish?" }}</h2>
+        <p class="text-body-secondary">{{ "Students can access this quiz." if quiz.is_published else "Add at least one question, then publish when you’re ready for students." }}</p>
+        {% if not quiz.questions and not quiz.is_published %}
+        <button class="btn btn-primary w-100" type="button" disabled>Publish quiz</button>
+        {% else %}
+        <form method="post" action="{{ url_for('main.publish_quiz', quiz_id=quiz.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn {{ 'btn-outline-secondary' if quiz.is_published else 'btn-primary' }} w-100" type="submit">{{ "Unpublish quiz" if quiz.is_published else "Publish quiz" }}</button>
+        </form>
+        {% endif %}
+      </section>
+      {% if not attempt_count %}
+      <section class="quiz-delete-panel">
+        <p>Need to remove this quiz?</p>
+        <form method="post" action="{{ url_for('main.delete_quiz', quiz_id=quiz.id) }}"
+              onsubmit="return confirm('Delete this quiz and all its questions? This cannot be undone.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-link text-danger p-0" type="submit">Delete quiz</button>
+        </form>
+      </section>
+      {% endif %}
+    </aside>
   </div>
 </section>
 {% endblock %}
@@ -138,18 +368,99 @@
 {{ super() }}
 <script>
   (() => {
+    const builder = document.querySelector("#question-builder");
+    if (builder?.querySelector(".alert-danger")) {
+      builder.scrollIntoView();
+    }
+  })();
+
+  (() => {
     const typePicker = document.querySelector("#question_type");
+    if (!typePicker) return;
     const sections = {
       single_choice: document.querySelector("#multiple-choice-help"),
       true_false: document.querySelector("#true-false-help"),
       short_answer: document.querySelector("#short-answer-help"),
     };
+    const prompt = document.querySelector("#prompt");
+    const options = document.querySelector("#options");
+    const acceptedAnswers = document.querySelector("#accepted_answers");
+    const points = document.querySelector("#points");
+    const correctChoice = document.querySelector("#correct_option");
+    const previewPrompt = document.querySelector("#preview-prompt");
+    const previewOptions = document.querySelector("#preview-options");
+    const previewPoints = document.querySelector("#preview-points");
+    const answerNote = document.querySelector("#preview-answer-note");
     const updateQuestionType = () => {
       Object.entries(sections).forEach(([type, section]) => {
         section.hidden = type !== typePicker.value;
       });
+      previewOptions.replaceChildren();
+      const questionText = prompt.value.trim();
+      previewPrompt.textContent = questionText || "Your question will appear here.";
+      previewPoints.textContent = `${points.value || "1"} ${Number(points.value) === 1 ? "point" : "points"}`;
+      if (typePicker.value === "single_choice") {
+        const choices = options.value.split(/\r?\n/).filter((option) => option.trim());
+        const selectedChoice = correctChoice.value || correctChoice.dataset.selectedOption;
+        correctChoice.replaceChildren();
+        choices.forEach((option, index) => {
+          const value = String(index + 1);
+          const choice = document.createElement("option");
+          choice.value = value;
+          choice.textContent = `Choice ${value}: ${option.trim()}`;
+          choice.selected = value === selectedChoice;
+          correctChoice.append(choice);
+          const row = document.createElement("div");
+          row.className = "question-preview-option";
+          const radio = document.createElement("span");
+          radio.className = `option-radio${value === selectedChoice ? " is-selected" : ""}`;
+          radio.setAttribute("aria-hidden", "true");
+          const label = document.createElement("span");
+          label.textContent = option.trim();
+          row.append(radio, label);
+          if (value === selectedChoice) {
+            const badge = document.createElement("small");
+            badge.className = "preview-correct-label";
+            badge.textContent = "Correct";
+            row.append(badge);
+          }
+          previewOptions.append(row);
+        });
+        if (choices.length === 0) {
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Add choices above";
+          correctChoice.append(placeholder);
+        }
+        answerNote.textContent = "Multiple choice · one correct answer";
+      } else if (typePicker.value === "true_false") {
+        correctChoice.replaceChildren();
+        ["True", "False"].forEach((option) => {
+          const row = document.createElement("div");
+          row.className = "question-preview-option";
+          row.innerHTML = '<span class="option-radio" aria-hidden="true"></span>';
+          const label = document.createElement("span");
+          label.textContent = option;
+          row.append(label);
+          previewOptions.append(row);
+        });
+        answerNote.textContent = "True or false · automatically graded";
+      } else {
+        correctChoice.replaceChildren();
+        const response = document.createElement("div");
+        response.className = "form-control question-preview-input";
+        response.textContent = "Student response";
+        previewOptions.append(response);
+        const hasAcceptedAnswers = acceptedAnswers.value.split(/\r?\n/).some((answer) => answer.trim());
+        answerNote.textContent = hasAcceptedAnswers
+          ? "Short answer · accepted responses are auto-graded"
+          : "Short answer · manual grading";
+      }
     };
-    typePicker.addEventListener("change", updateQuestionType);
+    [typePicker, prompt, options, acceptedAnswers, points, correctChoice].forEach((field) => {
+      field.addEventListener("input", updateQuestionType);
+      field.addEventListener("change", updateQuestionType);
+    });
     updateQuestionType();
   })();
 </script>

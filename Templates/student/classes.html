@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}My classes · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">MY LEARNING</p><h1>My classes</h1><p class="text-body-secondary mb-0">Join a class with the code provided by your teacher. Assigned quizzes will then appear in Available quizzes.</p></div>
+  </header>
+  <div class="student-quiz-details-grid">
+    <section class="instructor-panel">
+      <h2 class="h5">Join a class</h2>
+      <form method="post" action="{{ url_for('main.join_class') }}" class="d-flex flex-column flex-sm-row gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="visually-hidden" for="class-code">Class code</label>
+        <input class="form-control text-uppercase" id="class-code" name="class_code" maxlength="16" required autocomplete="off" placeholder="Enter class code">
+        <button class="btn btn-primary text-nowrap" type="submit">Join class</button>
+      </form>
+    </section>
+    <aside class="instructor-panel">
+      <h2 class="h5">Need a code?</h2>
+      <p class="text-body-secondary mb-0">Ask your teacher for the code for your class. You can use the same code again safely if you are already enrolled.</p>
+    </aside>
+  </div>
+  <section class="instructor-panel mt-4">
+    <div class="instructor-panel-heading"><div><h2>Joined classes</h2><p>Your teachers control which quizzes are assigned to each class.</p></div></div>
+    {% if enrollments %}
+    <div class="list-group list-group-flush">
+      {% for enrollment in enrollments %}
+      <div class="list-group-item d-flex justify-content-between align-items-center gap-3 px-0">
+        <div><strong>{{ enrollment.class_group.name }}</strong><div class="small text-body-secondary">Teacher: {{ enrollment.class_group.instructor.display_name }}</div></div>
+        <span class="badge text-bg-secondary">{{ enrollment.class_group.quiz_assignments|length }} assigned</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="instructor-empty instructor-empty-compact"><h3>You haven’t joined a class</h3><p class="text-body-secondary">Enter a class code above to see private quizzes from your teacher.</p></div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

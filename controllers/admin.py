@@ -1,24 +1,40 @@
-from flask import abort, g, redirect, render_template, request, url_for
+from flask import abort, g, redirect, request, url_for
 from flask_admin import Admin, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.theme import Theme
 from sqlalchemy import inspect as sqlalchemy_inspect
 from werkzeug.exceptions import HTTPException
 from wtforms.fields.choices import SelectChoice
+from wtforms import BooleanField, PasswordField
+from werkzeug.security import generate_password_hash
 
 from controllers.shared import (
     ROLE_LABELS,
     ROLE_PERMISSIONS,
     has_permission,
-    main,
-    permission_required,
 )
 from models import (
+    ClassEnrollment,
+    ClassGroup,
     QuestionOption,
+    QuizAcceptedAnswer,
     Quiz,
     QuizAnswer,
     QuizAttempt,
+    QuizAttemptAllowance,
+    QuizAttemptInvalidation,
+    QuizAttemptLock,
+    QuizAttemptPause,
+    QuizAttemptTiming,
+    QuizClassAssignment,
+    QuizClosure,
+    QuizExamMode,
     QuizQuestion,
+    QuizQuestionSection,
+    QuizSection,
+    QuizSettings,
+    QuizStudentAssignment,
+    LoginToken,
     User,
     db,
 )
@@ -42,6 +58,12 @@ class QuizAdminModelView(QuizAdminAccessMixin, ModelView):
     pass
 
 
+class FlaskAdminChoice(SelectChoice):
+    @property
+    def name(self):
+        return self.label
+
+
 class QuizView(QuizAdminModelView):
     form_columns = (
         "instructor_id",
@@ -54,10 +76,91 @@ class QuizView(QuizAdminModelView):
     column_list = ("id", "title", "instructor_id", "is_published")
 
 
-class FlaskAdminChoice(SelectChoice):
-    @property
-    def name(self):
-        return self.label
+class QuizSettingsView(QuizAdminModelView):
+    form_columns = (
+        "quiz",
+        "available_from",
+        "available_until",
+        "interface_theme",
+        "new_password",
+        "clear_password",
+    )
+    form_extra_fields = {
+        "new_password": PasswordField(
+            "Set quiz password",
+            description="Leave blank to keep the current password.",
+        ),
+        "clear_password": BooleanField(
+            "Remove quiz password",
+            description="Select this to allow access without a password.",
+        ),
+    }
+    column_list = (
+        "quiz_id",
+        "available_from",
+        "available_until",
+        "interface_theme",
+    )
+    form_choices = {
+        "interface_theme": tuple(
+            FlaskAdminChoice(value=value, label=label)
+            for value, label in (
+                ("classic", "Classic cards"),
+                ("focus", "Focus mode"),
+                ("compact", "Compact list"),
+            )
+        )
+    }
+
+    def on_model_change(self, form, model, is_created):
+        if form.new_password.data:
+            model.password_hash = generate_password_hash(form.new_password.data)
+        elif form.clear_password.data:
+            model.password_hash = None
+        for field_name in ("new_password", "clear_password"):
+            if hasattr(model, field_name):
+                delattr(model, field_name)
+
+
+class QuizExamModeView(QuizAdminModelView):
+    form_columns = ("quiz", "enabled")
+    column_list = ("quiz_id", "enabled")
+
+
+class QuizSectionView(QuizAdminModelView):
+    form_columns = ("quiz", "position", "title")
+    column_list = ("id", "quiz_id", "position", "title")
+
+
+class QuizQuestionSectionView(QuizAdminModelView):
+    form_columns = ("question", "section")
+    column_list = ("question_id", "section_id")
+
+
+class QuizClosureView(QuizAdminModelView):
+    form_columns = ("quiz", "ended_at")
+    column_list = ("quiz_id", "ended_at")
+
+
+class ClassGroupView(QuizAdminModelView):
+    form_columns = ("instructor", "name", "class_code")
+    column_list = ("id", "name", "class_code", "instructor_id", "created_at")
+    column_searchable_list = ("name", "class_code")
+
+
+class ClassEnrollmentView(QuizAdminModelView):
+    form_columns = ("class_group", "student", "joined_at")
+    column_list = ("id", "class_id", "student_id", "joined_at")
+
+
+class QuizClassAssignmentView(QuizAdminModelView):
+    form_columns = ("quiz", "class_group")
+    column_list = ("id", "quiz_id", "class_id")
+
+
+class QuizStudentAssignmentView(QuizAdminModelView):
+    form_columns = ("quiz", "student")
+    column_list = ("id", "quiz_id", "student_id")
 
 
 QUESTION_TYPE_LABELS = {
@@ -120,7 +223,26 @@ class QuizQuestionView(QuizAdminModelView):
                     },
                 },
             },
-        )
+        ),
+        (
+            QuizAcceptedAnswer,
+            {
+                "form_columns": ("id", "position", "answer"),
+                "column_labels": {
+                    "position": "Order",
+                    "answer": "Accepted response",
+                },
+                "form_args": {
+                    "position": {
+                        "description": "Order of an accepted short-answer response.",
+                    },
+                    "answer": {
+                        "label": "Accepted response",
+                        "description": "Short answers matching this response are automatically graded correct.",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -142,6 +264,16 @@ class QuizAttemptView(QuizAdminModelView):
         "status",
         "score",
     )
+    form_choices = {
+        "status": tuple(
+            FlaskAdminChoice(value=value, label=label)
+            for value, label in (
+                ("in_progress", "In progress"),
+                ("submitted", "Submitted"),
+                ("graded", "Graded"),
+            )
+        )
+    }
 
 
 class QuizAnswerView(QuizAdminModelView):
@@ -161,6 +293,42 @@ class QuizAnswerView(QuizAdminModelView):
         "response_text",
         "points_awarded",
     )
+
+
+class QuizAttemptTimingView(QuizAdminModelView):
+    form_columns = ("attempt", "deadline_at")
+    column_list = ("attempt_id", "deadline_at")
+
+
+class QuizAttemptPauseView(QuizAdminModelView):
+    form_columns = ("attempt", "paused_at")
+    column_list = ("attempt_id", "paused_at")
+
+
+class QuizAttemptLockView(QuizAdminModelView):
+    form_columns = ("attempt", "locked_at", "reason")
+    column_list = ("attempt_id", "locked_at", "reason")
+    form_choices = {
+        "reason": tuple(
+            FlaskAdminChoice(value=value, label=label)
+            for value, label in (
+                ("instructor", "Instructor"),
+                ("focus_lost", "Locked after tab lost focus"),
+                ("saved_progress", "Locked after saving progress"),
+                ("quiz_ended", "Quiz ended"),
+            )
+        )
+    }
+
+
+class QuizAttemptAllowanceView(QuizAdminModelView):
+    form_columns = ("quiz_id", "user_id", "additional_attempts")
+    column_list = ("quiz_id", "user_id", "additional_attempts")
+
+
+class QuizAttemptInvalidationView(QuizAdminModelView):
+    form_columns = ("attempt_id", "invalidated_by_id", "invalidated_at")
+    column_list = ("attempt_id", "invalidated_by_id", "invalidated_at")
 
 
 class UserAdminAccessMixin:
@@ -234,6 +402,9 @@ class UserAdminView(UserAdminAccessMixin, ModelView):
                     409,
                     description="At least one administrator account must remain.",
                 )
+        LoginToken.query.filter_by(user_id=model.id).delete(
+            synchronize_session=False
+        )
 
 
 def init_admin(app):
@@ -255,7 +426,6 @@ def init_admin(app):
             name="Users",
             endpoint="admin_users_data",
             url="/admin/user",
-            category="User management",
         )
     )
     admin.add_view(
@@ -265,8 +435,56 @@ def init_admin(app):
             name="Quizzes",
             endpoint="admin_quizzes_data",
             url="/admin/quiz",
+            category="Quiz management",
         )
     )
+    for view_class, model, name, endpoint, path in (
+        (
+            QuizSettingsView,
+            QuizSettings,
+            "Availability and theme",
+            "admin_quiz_settings",
+            "/admin/quiz-settings",
+        ),
+        (
+            QuizExamModeView,
+            QuizExamMode,
+            "Exam mode",
+            "admin_exam_modes",
+            "/admin/exam-mode",
+        ),
+        (
+            QuizSectionView,
+            QuizSection,
+            "Sections",
+            "admin_quiz_sections",
+            "/admin/quiz-section",
+        ),
+        (
+            QuizQuestionSectionView,
+            QuizQuestionSection,
+            "Question sections",
+            "admin_question_sections",
+            "/admin/question-section",
+        ),
+        (
+            QuizClosureView,
+            QuizClosure,
+            "Quiz closures",
+            "admin_quiz_closures",
+            "/admin/quiz-closure",
+        ),
+    ):
+        admin.add_view(
+            view_class(
+                model,
+                db.session,
+                name=name,
+                endpoint=endpoint,
+                url=path,
+                category="Quiz management",
+            )
+        )
     admin.add_view(
         QuizQuestionView(
             QuizQuestion,
@@ -274,6 +492,7 @@ def init_admin(app):
             name="Questions",
             endpoint="admin_questions_data",
             url="/admin/question",
+            category="Quiz management",
         )
     )
     admin.add_view(
@@ -283,6 +502,7 @@ def init_admin(app):
             name="Attempts",
             endpoint="admin_attempts_data",
             url="/admin/attempt",
+            category="Attempts",
         )
     )
     admin.add_view(
@@ -292,63 +512,91 @@ def init_admin(app):
             name="Answers",
             endpoint="admin_answers_data",
             url="/admin/answer",
+            category="Attempts",
         )
     )
+    for view_class, model, name, endpoint, path, category in (
+        (
+            QuizAttemptTimingView,
+            QuizAttemptTiming,
+            "Attempt timers",
+            "admin_attempt_timings",
+            "/admin/attempt-timing",
+            "Attempts",
+        ),
+        (
+            QuizAttemptPauseView,
+            QuizAttemptPause,
+            "Paused attempts",
+            "admin_attempt_pauses",
+            "/admin/attempt-pause",
+            "Attempts",
+        ),
+        (
+            QuizAttemptLockView,
+            QuizAttemptLock,
+            "Attempt locks",
+            "admin_attempt_locks",
+            "/admin/attempt-lock",
+            "Attempts",
+        ),
+        (
+            QuizAttemptAllowanceView,
+            QuizAttemptAllowance,
+            "Extra attempt grants",
+            "admin_attempt_allowances",
+            "/admin/attempt-allowance",
+            "Attempts",
+        ),
+        (
+            QuizAttemptInvalidationView,
+            QuizAttemptInvalidation,
+            "Invalidated attempts",
+            "admin_attempt_invalidations",
+            "/admin/attempt-invalidation",
+            "Attempts",
+        ),
+        (
+            ClassGroupView,
+            ClassGroup,
+            "Classes",
+            "admin_classes",
+            "/admin/class",
+            "Classes",
+        ),
+        (
+            ClassEnrollmentView,
+            ClassEnrollment,
+            "Enrollments",
+            "admin_class_enrollments",
+            "/admin/class-enrollment",
+            "Classes",
+        ),
+        (
+            QuizClassAssignmentView,
+            QuizClassAssignment,
+            "Class quiz assignments",
+            "admin_class_quiz_assignments",
+            "/admin/class-quiz-assignment",
+            "Classes",
+        ),
+        (
+            QuizStudentAssignmentView,
+            QuizStudentAssignment,
+            "Individual quiz assignments",
+            "admin_student_quiz_assignments",
+            "/admin/student-quiz-assignment",
+            "Classes",
+        ),
+    ):
+        admin.add_view(
+            view_class(
+                model,
+                db.session,
+                name=name,
+                endpoint=endpoint,
+                url=path,
+                category=category,
+            )
+        )
     return admin
-
-
-@main.route("/admin/users", methods=["GET", "POST"])
-@permission_required("users.manage")
-def admin_users():
-    message = None
-    if request.method == "POST":
-        if not has_permission("roles.assign"):
-            abort(403)
-
-        user_id = request.form.get("user_id", type=int)
-        role = request.form.get("role")
-        user = db.session.get(User, user_id) if user_id else None
-        if user is None or role not in ROLE_LABELS:
-            abort(400)
-
-        if user.role == "admin" and role != "admin":
-            administrator_count = User.query.filter_by(role="admin").count()
-            if administrator_count <= 1:
-                abort(409, description="At least one administrator account must remain.")
-
-        user.role = role
-        db.session.commit()
-        message = f"{user.display_name}'s role was updated to {ROLE_LABELS[role]}."
-
-    users = User.query.order_by(User.created_at.desc(), User.email.asc()).all()
-    return render_template("admin/users.html", users=users, message=message)
-
-
-@main.route("/admin/quizzes", endpoint="admin_quizzes")
-@permission_required("quiz.manage_all")
-def admin_quizzes():
-    abort(501, description="Administrator quiz listing is not implemented.")
-
-
-@main.route("/admin/dashboard", endpoint="admin_dashboard")
-@permission_required("quiz.manage_all")
-def admin_dashboard():
-    return redirect(url_for("quiz_admin.index"))
-
-
-@main.route(
-    "/admin/quizzes/<int:quiz_id>",
-    endpoint="admin_quiz_details",
-)
-@permission_required("quiz.manage_all")
-def admin_quiz_details(quiz_id):
-    abort(501, description="Administrator quiz details are not implemented.")
-
-
-@main.route(
-    "/admin/attempts/<int:attempt_id>",
-    endpoint="admin_quiz_attempt_details",
-)
-@permission_required("quiz.manage_all")
-def admin_quiz_attempt_details(attempt_id):
-    abort(501, description="Administrator attempt review is not implemented.")

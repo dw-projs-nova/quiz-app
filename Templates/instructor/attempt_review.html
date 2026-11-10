@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Review attempt · {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb">
+    <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">{{ quiz.title }}</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <a href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}">Attempts</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <span>Review</span>
+  </div>
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">ATTEMPT REVIEW</p><h1>{{ student.display_name }}</h1><p class="text-body-secondary mb-0">{{ student.email }} · Attempt #{{ attempt.attempt_number }}</p></div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}">Back to attempts</a>
+  </header>
+
+  <div class="attempt-summary instructor-panel">
+    <div><span>Status</span><strong>{{ attempt.status.replace("_", " ")|title }}</strong></div>
+    <div><span>Started</span><strong>{{ attempt.started_at.strftime("%b %d, %Y · %I:%M %p") }}</strong></div>
+    <div><span>Submitted</span><strong>{{ attempt.submitted_at.strftime("%b %d, %Y · %I:%M %p") if attempt.submitted_at else "Not submitted" }}</strong></div>
+    <div><span>Score</span><strong>{{ attempt.score if attempt.score is not none else "Not graded" }}</strong></div>
+  </div>
+
+  {% if invalidated %}
+  <div class="alert alert-warning" role="status">This attempt has been invalidated. It is kept for review but is excluded from attempt limits and grading.</div>
+  {% endif %}
+
+  {% if attempt.status == "in_progress" %}
+  <div class="instructor-notice"><i class="fa fa-info-circle" aria-hidden="true"></i><span>This attempt is still in progress. You can review saved answers, but grading is available after submission.</span></div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('main.grade_quiz_attempt', quiz_id=quiz.id, attempt_id=attempt.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="attempt-answer-list">
+      {% for question in quiz.questions %}
+      {% set answer = answers.get(question.id) %}
+      <article class="instructor-panel attempt-answer-card">
+        <div class="attempt-answer-heading">
+          <div><p class="instructor-eyebrow">QUESTION {{ question.position }}</p><h2>{{ question.prompt }}</h2></div>
+          <span class="question-count-pill">{{ question.points }} pts</span>
+        </div>
+        <div class="student-answer-block">
+          <span class="student-answer-label">Student response</span>
+          {% if answer %}
+            {% if answer.selected_option_id %}
+              {% for option in question.options %}
+                {% if option.id == answer.selected_option_id %}<p class="student-answer-value">{{ option.text }}</p>{% endif %}
+              {% endfor %}
+            {% else %}
+              <p class="student-answer-value">{{ answer.response_text }}</p>
+            {% endif %}
+          {% else %}
+            <p class="student-answer-value text-body-secondary">No response</p>
+          {% endif %}
+          {% if answer and answer.selected_option_id %}
+            {% for option in question.options %}
+              {% if option.id == answer.selected_option_id %}
+                <p class="question-note mb-0">{{ "Correct choice" if option.is_correct else "Incorrect choice" }}{% if option.is_correct %} · {{ question.points }} points{% else %} · 0 points{% endif %}</p>
+              {% endif %}
+            {% endfor %}
+          {% elif answer %}
+            <p class="question-note mb-0">Written responses are graded by the instructor.</p>
+          {% endif %}
+        </div>
+        {% if answer %}
+        <div class="grade-answer-control">
+          <label class="form-label" for="points_{{ answer.id }}">Points awarded</label>
+          <div class="input-group">
+            <input class="form-control" id="points_{{ answer.id }}" name="points_{{ answer.id }}"
+                   type="number" min="0" max="{{ question.points }}" step="0.01"
+                   value="{{ answer.points_awarded if answer.points_awarded is not none else (question.points if answer.selected_option_id and answer.selected_option_id in (question.options|selectattr('is_correct')|map(attribute='id')|list) else 0) }}"
+                   required {% if attempt.status == "in_progress" or invalidated %}disabled{% endif %}>
+            <span class="input-group-text">/ {{ question.points }}</span>
+          </div>
+        </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% if attempt.status in ["submitted", "graded"] and not invalidated %}
+    <div class="attempt-grade-footer">
+      <p class="text-body-secondary mb-0">Save points for all submitted responses. Questions left unanswered count as zero.</p>
+      <button class="btn btn-primary" type="submit">{{ "Save grade" if attempt.status == "graded" else "Submit grade" }}</button>
+    </div>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

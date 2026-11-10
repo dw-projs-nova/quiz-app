@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Instructor overview · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-heading">
+    <div>
+      <p class="instructor-eyebrow">INSTRUCTOR WORKSPACE</p>
+      <h1>Good to see you, {{ current_user.display_name }}</h1>
+      <p class="text-body-secondary mb-0">Your teaching workspace at a glance.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}"><i class="fa fa-plus me-2" aria-hidden="true"></i>Create a quiz</a>
+  </div>
+
+  <nav class="instructor-subnav" aria-label="Instructor workspace">
+    <a class="active" href="{{ url_for('main.instructor_dashboard') }}" aria-current="page">Overview</a>
+    <a href="{{ url_for('main.instructor_quizzes') }}">Quizzes</a>
+  </nav>
+
+  <div class="instructor-stat-grid">
+    <article class="instructor-stat-card">
+      <span class="instructor-stat-icon" aria-hidden="true"><i class="fa fa-book"></i></span>
+      <div><p>Total quizzes</p><strong>{{ quiz_count }}</strong><small>Across your workspace</small></div>
+    </article>
+    <article class="instructor-stat-card">
+      <span class="instructor-stat-icon is-green" aria-hidden="true"><i class="fa fa-check-circle"></i></span>
+      <div><p>Published</p><strong>{{ published_count }}</strong><small>Available to students</small></div>
+    </article>
+    <article class="instructor-stat-card">
+      <span class="instructor-stat-icon is-amber" aria-hidden="true"><i class="fa fa-pencil-square-o"></i></span>
+      <div><p>Drafts</p><strong>{{ draft_count }}</strong><small>Still in progress</small></div>
+    </article>
+    <article class="instructor-stat-card">
+      <span class="instructor-stat-icon is-blue" aria-hidden="true"><i class="fa fa-inbox"></i></span>
+      <div><p>Needs review</p><strong>{{ pending_count }}</strong><small>{{ total_attempts }} total attempts</small></div>
+    </article>
+  </div>
+
+  <div class="instructor-content-grid">
+    <section class="instructor-panel">
+      <div class="instructor-panel-heading">
+        <div><h2>Recent quizzes</h2><p>Your latest work, ready to pick up.</p></div>
+        <a href="{{ url_for('main.instructor_quizzes') }}">View all <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>
+      </div>
+      {% if quizzes %}
+      <div class="instructor-recent-list">
+        {% for quiz in quizzes %}
+        <a class="instructor-recent-item" href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">
+          <span class="instructor-quiz-mark" aria-hidden="true"><i class="fa fa-file-text-o"></i></span>
+          <span class="instructor-recent-copy">
+            <strong>{{ quiz.title }}</strong>
+            <small>{{ attempt_counts.get(quiz.id, 0) }} attempts · Updated {{ quiz.updated_at.strftime("%b %d") }}</small>
+          </span>
+          <span class="instructor-status {{ 'is-published' if quiz.is_published else 'is-draft' }}">{{ "Published" if quiz.is_published else "Draft" }}</span>
+          <i class="fa fa-angle-right instructor-chevron" aria-hidden="true"></i>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="instructor-empty instructor-empty-compact">
+        <span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-book"></i></span>
+        <h3>No quizzes yet</h3>
+        <p class="text-body-secondary">Create your first assessment to get started.</p>
+        <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}">Create your first quiz</a>
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="instructor-panel instructor-quick-panel">
+      <div class="instructor-panel-heading">
+        <div><h2>Quick links</h2><p>Common instructor tasks.</p></div>
+      </div>
+      <a class="instructor-quick-link" href="{{ url_for('main.create_quiz') }}">
+        <span class="instructor-quick-icon" aria-hidden="true"><i class="fa fa-plus"></i></span>
+        <span><strong>Create a quiz</strong><small>Start a new assessment</small></span>
+        <i class="fa fa-angle-right" aria-hidden="true"></i>
+      </a>
+      <a class="instructor-quick-link" href="{{ url_for('main.instructor_quizzes') }}">
+        <span class="instructor-quick-icon is-teal" aria-hidden="true"><i class="fa fa-list"></i></span>
+        <span><strong>Manage quizzes</strong><small>Edit content and settings</small></span>
+        <i class="fa fa-angle-right" aria-hidden="true"></i>
+      </a>
+    </aside>
+  </div>
+</section>
+{% endblock %}

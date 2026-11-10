@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{{ quiz.title }} · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb"><a href="{{ url_for('main.available_quizzes') }}">Available quizzes</a><i class="fa fa-angle-right" aria-hidden="true"></i><span>{{ quiz.title }}</span></div>
+  <div class="student-quiz-details-grid">
+    <article class="instructor-panel student-quiz-overview">
+      <p class="instructor-eyebrow">QUIZ DETAILS</p>
+      <h1>{{ quiz.title }}</h1>
+      <p class="student-quiz-description">{{ quiz.description or "No description provided." }}</p>
+      <div class="quiz-meta-line">
+        <span><i class="fa fa-list-ol" aria-hidden="true"></i> {{ quiz.questions|length }} questions</span>
+        <span><i class="fa fa-star-o" aria-hidden="true"></i> {{ total_points }} points</span>
+        <span><i class="fa fa-clock-o" aria-hidden="true"></i> {{ (quiz.time_limit_seconds // 60 ~ " min") if quiz.time_limit_seconds else "No time limit" }}</span>
+        <span><i class="fa fa-refresh" aria-hidden="true"></i> {{ quiz.max_attempts if quiz.max_attempts else "Unlimited" }} attempts</span>
+      </div>
+      {% if availability_start or availability_end %}
+      <p class="question-note mt-3">
+        {% if availability_start %}Opens {{ availability_start.strftime("%b %d, %Y · %I:%M %p UTC") }}{% endif %}
+        {% if availability_start and availability_end %} · {% endif %}
+        {% if availability_end %}Closes {{ availability_end.strftime("%b %d, %Y · %I:%M %p UTC") }}{% endif %}
+      </p>
+      {% endif %}
+      <h2>Before you begin</h2>
+      <ul class="student-quiz-guidance">
+        <li>Your answers are saved when you choose “Save progress.”</li>
+        <li>Submitting ends the attempt. You can’t change answers afterward.</li>
+        {% if quiz.time_limit_seconds %}<li>Your time limit starts when you begin.</li>{% endif %}
+        <li>Results appear after submission; some written answers may need instructor review.</li>
+      </ul>
+    </article>
+    <aside class="instructor-panel student-start-panel">
+      <h2>Your progress</h2>
+      {% if active_attempt %}
+      <p>You have an attempt in progress. Continue where you left off.</p>
+      <a class="btn btn-primary w-100" href="{{ url_for('main.take_quiz_attempt', attempt_id=active_attempt.id) }}">Continue attempt</a>
+      {% elif can_start %}
+      <p>Attempts used: {{ attempt_count }}{% if attempt_limit is not none %} of {{ attempt_limit }}{% else %} · unlimited allowed{% endif %}</p>
+      <form method="post" action="{{ url_for('main.start_quiz_attempt', quiz_id=quiz.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if password_required %}
+        <label class="form-label" for="quiz-password">Quiz password</label>
+        <input class="form-control mb-3" id="quiz-password" name="password" type="password"
+               required autocomplete="off">
+        {% endif %}
+        <button class="btn btn-primary w-100" type="submit">{{ "Retake quiz" if attempt_count else "Start quiz" }}</button>
+      </form>
+      {% elif not available_now and (attempt_limit is none or attempt_count < attempt_limit) %}
+      <p>{{ availability_message }}</p>
+      <button class="btn btn-outline-secondary w-100" type="button" disabled>Not available</button>
+      {% else %}
+      <p>You have used all attempts available for this quiz.</p>
+      <button class="btn btn-outline-secondary w-100" type="button" disabled>Attempts used</button>
+      {% endif %}
+      <a class="student-back-link" href="{{ url_for('main.available_quizzes') }}">Back to available quizzes</a>
+    </aside>
+  </div>
+</section>
+{% endblock %}

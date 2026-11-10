@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Results · {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb"><a href="{{ url_for('main.student_dashboard') }}">My learning</a><i class="fa fa-angle-right" aria-hidden="true"></i><span>Quiz results</span></div>
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">ATTEMPT #{{ attempt.attempt_number }}</p><h1>{{ quiz.title }}</h1><p class="text-body-secondary mb-0">Submitted {{ attempt.submitted_at.strftime("%b %d, %Y · %I:%M %p") if attempt.submitted_at else "recently" }}</p></div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if can_retake %}<a class="btn btn-primary" href="{{ url_for('main.quiz_details', quiz_id=quiz.id) }}">Retake quiz</a>{% endif %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.student_dashboard') }}">My learning</a>
+    </div>
+  </header>
+  <section class="instructor-panel student-result-summary">
+    {% if attempt.status == "graded" %}
+    <span class="student-result-icon is-graded" aria-hidden="true"><i class="fa fa-check"></i></span>
+    <div><p class="instructor-eyebrow">YOUR SCORE</p><strong>{{ attempt.score }} <small>/ {{ total_points }}</small></strong><p class="text-body-secondary mb-0">{{ ((attempt.score / total_points * 100)|round|int) if total_points else 0 }}% · Automatically graded</p></div>
+    {% else %}
+    <span class="student-result-icon" aria-hidden="true"><i class="fa fa-clock-o"></i></span>
+    <div><p class="instructor-eyebrow">SUBMITTED FOR REVIEW</p><strong>Pending</strong><p class="text-body-secondary mb-0">Some written responses need instructor review. Your final score will appear when grading is complete.</p></div>
+    {% endif %}
+  </section>
+  <section class="student-question-list student-results-list">
+    {% for question in quiz.questions %}
+    {% set answer = answers.get(question.id) %}
+    <article class="instructor-panel student-question-card">
+      <div class="student-question-number">Question {{ question.position }} <span>{{ question.points }} pts</span></div>
+      <h2>{{ question.prompt }}</h2>
+      {% if answer %}
+        {% if answer.selected_option_id %}
+          {% for option in question.options %}
+            {% if option.id == answer.selected_option_id %}
+            <p class="student-result-answer {{ 'is-correct' if option.is_correct else 'is-incorrect' }}"><i class="fa {{ 'fa-check-circle' if option.is_correct else 'fa-times-circle' }}" aria-hidden="true"></i> {{ option.text }}</p>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <p class="student-result-answer"><i class="fa fa-pencil" aria-hidden="true"></i> {{ answer.response_text }}</p>
+        {% endif %}
+        {% if answer.points_awarded is not none %}
+        <p class="question-note mb-0">{{ answer.points_awarded }} of {{ question.points }} points</p>
+        {% elif attempt.status != "graded" %}
+        <p class="question-note mb-0">Awaiting instructor review</p>
+        {% endif %}
+      {% else %}
+        <p class="student-result-answer text-body-secondary">No response · 0 points</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+</section>
+{% endblock %}

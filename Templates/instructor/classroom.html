@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}{{ classroom.name }} · Classes · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb"><a href="{{ url_for('main.instructor_classes') }}">Classes</a><i class="fa fa-angle-right" aria-hidden="true"></i><span>{{ classroom.name }}</span></div>
+  <header class="quiz-management-header instructor-panel">
+    <div class="quiz-management-copy">
+      <p class="instructor-eyebrow">CLASS ROSTER</p>
+      <h1>{{ classroom.name }}</h1>
+      <p class="text-body-secondary mb-0">Share this code with students to let them join your class.</p>
+    </div>
+    <div class="class-code-display"><span>CLASS CODE</span><strong>{{ classroom.class_code }}</strong></div>
+  </header>
+  <div class="student-quiz-details-grid classroom-assignment-grid mt-4">
+    <section class="instructor-panel">
+      <div class="instructor-panel-heading"><div><h2>Assigned quizzes</h2><p>Only enrolled students can see these published quizzes.</p></div></div>
+      <form method="post" class="d-flex flex-column flex-sm-row gap-2 mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="assign_quiz">
+        <label class="visually-hidden" for="quiz-id">Quiz to assign</label>
+        <select class="form-select" id="quiz-id" name="quiz_id" required>
+          <option value="">Choose a quiz</option>
+          {% for quiz in unassigned_quizzes %}
+          <option value="{{ quiz.id }}">{{ quiz.title }}{% if not quiz.is_published %} (draft){% endif %}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-primary text-nowrap" type="submit" {% if not unassigned_quizzes %}disabled{% endif %}>Assign to class</button>
+      </form>
+      {% if classroom.quiz_assignments %}
+      <div class="list-group list-group-flush">
+        {% for assignment in classroom.quiz_assignments %}
+        <div class="list-group-item d-flex align-items-center justify-content-between gap-3 px-0">
+          <div><strong>{{ assignment.quiz.title }}</strong><div class="small text-body-secondary">{{ "Published" if assignment.quiz.is_published else "Draft — not visible to students" }}</div></div>
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="remove_quiz">
+            <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-body-secondary mb-0">No quizzes are assigned to this class yet.</p>
+      {% endif %}
+    </section>
+    <section class="instructor-panel">
+      <div class="instructor-panel-heading"><div><h2>Assign to students</h2><p>Select a quiz and the students who should take it.</p></div></div>
+      {% if classroom.enrollments and quizzes %}
+      <form method="post" class="individual-assignment-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="assign_quiz_to_students">
+        <label class="form-label" for="individual-quiz-id">Quiz</label>
+        <select class="form-select mb-3" id="individual-quiz-id" name="quiz_id" required>
+          <option value="">Choose a quiz</option>
+          {% for quiz in quizzes %}
+          <option value="{{ quiz.id }}">{{ quiz.title }}{% if not quiz.is_published %} (draft — hidden from students){% endif %}</option>
+          {% endfor %}
+        </select>
+        <fieldset class="individual-student-picker">
+          <legend class="form-label">Students in {{ classroom.name }}</legend>
+          {% for enrollment in classroom.enrollments %}
+          <label class="individual-student-option">
+            <input class="form-check-input" type="checkbox" name="student_ids"
+                   value="{{ enrollment.student_id }}">
+            <span><strong>{{ enrollment.student.display_name }}</strong><small>{{ enrollment.student.email }}</small></span>
+          </label>
+          {% endfor %}
+        </fieldset>
+        <button class="btn btn-outline-primary mt-3" type="submit">Assign quiz to selected students</button>
+      </form>
+      {% elif not classroom.enrollments %}
+      <p class="text-body-secondary mb-0">Students will appear here after joining with the class code.</p>
+      {% else %}
+      <p class="text-body-secondary mb-0">Create a quiz before assigning it to students.</p>
+      {% endif %}
+    </section>
+    <section class="instructor-panel">
+      <div class="instructor-panel-heading"><div><h2>Students</h2><p>{{ classroom.enrollments|length }} enrolled</p></div></div>
+      {% if classroom.enrollments %}
+      <ul class="list-group list-group-flush">
+        {% for enrollment in classroom.enrollments %}
+        <li class="list-group-item px-0">
+          <strong>{{ enrollment.student.display_name }}</strong>
+          <span class="text-body-secondary">· {{ enrollment.student.email }}</span>
+          {% set student_assignments = individual_assignments.get(enrollment.student_id, []) %}
+          {% if student_assignments %}
+          <div class="student-individual-assignment-list">
+            {% for assignment in student_assignments %}
+            <div class="student-individual-assignment">
+              <span>{{ assignment.quiz.title }}{% if not assignment.quiz.is_published %} <small>(draft)</small>{% endif %}</span>
+              <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="remove_student_quiz">
+                <input type="hidden" name="student_id" value="{{ enrollment.student_id }}">
+                <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Remove {{ assignment.quiz.title }} assignment for {{ enrollment.student.display_name }}">Remove</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="small text-body-secondary mt-1">No individual quiz assignments.</div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-body-secondary mb-0">Students will appear here after joining with the class code.</p>
+      {% endif %}
+    </section>
+  </div>
+</section>
+{% endblock %}

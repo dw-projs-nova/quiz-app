@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Available quizzes · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">MY LEARNING</p><h1>Available quizzes</h1><p class="text-body-secondary mb-0">Choose an assessment when you’re ready to begin.</p></div>
+  </header>
+  <nav class="instructor-subnav" aria-label="Learning workspace">
+    <a href="{{ url_for('main.student_dashboard') }}">Overview</a>
+    <a class="active" href="{{ url_for('main.available_quizzes') }}" aria-current="page">Available quizzes</a>
+  </nav>
+  <section class="instructor-panel">
+    <form class="quiz-filters" method="get">
+      <div class="quiz-search"><label class="visually-hidden" for="quiz-search">Search quizzes</label><input class="form-control" id="quiz-search" name="q" type="search" value="{{ search }}" placeholder="Search quizzes"></div>
+      <button class="btn btn-outline-secondary" type="submit">Search</button>
+      {% if search %}<a class="btn btn-link" href="{{ url_for('main.available_quizzes') }}">Clear</a>{% endif %}
+    </form>
+    {% if quizzes %}
+    <div class="student-quiz-grid">
+      {% for quiz in quizzes %}
+      <article class="student-quiz-card">
+        <div class="student-quiz-card-top"><span class="instructor-quiz-mark" aria-hidden="true"><i class="fa fa-file-text-o"></i></span><span class="instructor-status is-published">Available</span></div>
+        <h2><a href="{{ url_for('main.quiz_details', quiz_id=quiz.id) }}">{{ quiz.title }}</a></h2>
+        <p>{{ quiz.description or "No description provided." }}</p>
+        <div class="quiz-meta-line"><span><i class="fa fa-list-ol" aria-hidden="true"></i> {{ quiz.questions|length }} questions</span><span><i class="fa fa-clock-o" aria-hidden="true"></i> {{ (quiz.time_limit_seconds // 60 ~ " min") if quiz.time_limit_seconds else "No time limit" }}</span></div>
+        <a class="btn btn-outline-primary" href="{{ url_for('main.quiz_details', quiz_id=quiz.id) }}">View quiz</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="instructor-empty"><span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-search"></i></span><h2>{{ "No quizzes match your search" if search else "No quizzes available yet" }}</h2><p class="text-body-secondary">{{ "Try another search." if search else "Published quizzes will appear here." }}</p></div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

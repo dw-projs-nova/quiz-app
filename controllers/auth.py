@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from controllers.mail import send_login_email
 from controllers.shared import main, require_login
-from models import LoginToken, PendingLoginToken, User, db
+from models import ClassEnrollment, ClassGroup, LoginToken, PendingLoginToken, User, db
 
 
 def login_serializer():
@@ -201,6 +201,19 @@ def account():
     if login_redirect:
         return login_redirect
 
+    joined_classes = []
+    managed_class_count = 0
+    if g.current_user.role == "student":
+        joined_classes = (
+            ClassEnrollment.query.filter_by(student_id=g.current_user.id)
+            .order_by(ClassEnrollment.joined_at.desc())
+            .all()
+        )
+    elif g.current_user.role == "instructor":
+        managed_class_count = ClassGroup.query.filter_by(
+            instructor_id=g.current_user.id
+        ).count()
+
     message = None
     if request.method == "POST":
         display_name = request.form.get("display_name", "").strip()
@@ -208,9 +221,16 @@ def account():
             return render_template(
                 "account/profile.html",
                 error="Display name is required and must be 120 characters or fewer.",
+                joined_classes=joined_classes,
+                managed_class_count=managed_class_count,
             ), 400
         g.current_user.display_name = display_name
         db.session.commit()
         message = "Profile updated."
 
-    return render_template("account/profile.html", message=message)
+    return render_template(
+        "account/profile.html",
+        message=message,
+        joined_classes=joined_classes,
+        managed_class_count=managed_class_count,
+    )

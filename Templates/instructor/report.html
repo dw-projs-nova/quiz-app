@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Report · {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb">
+    <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">{{ quiz.title }}</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <span>Report</span>
+  </div>
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">QUIZ WORKSPACE</p><h1>Quiz report</h1><p class="text-body-secondary mb-0">{{ quiz.title }}</p></div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Back to quiz</a>
+  </header>
+  <nav class="instructor-subnav" aria-label="Quiz workspace">
+    <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Questions</a>
+    <a href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}">Attempts</a>
+    <a class="active" href="{{ url_for('main.quiz_report', quiz_id=quiz.id) }}" aria-current="page">Reports</a>
+  </nav>
+
+  <div class="instructor-stat-grid report-stat-grid">
+    <article class="instructor-stat-card"><span class="instructor-stat-icon" aria-hidden="true"><i class="fa fa-inbox"></i></span><div><p>Total attempts</p><strong>{{ attempt_count }}</strong><small>Student submissions and in-progress work</small></div></article>
+    <article class="instructor-stat-card"><span class="instructor-stat-icon is-green" aria-hidden="true"><i class="fa fa-check-circle"></i></span><div><p>Graded</p><strong>{{ graded_count }}</strong><small>Scored attempts</small></div></article>
+    <article class="instructor-stat-card"><span class="instructor-stat-icon is-amber" aria-hidden="true"><i class="fa fa-clock-o"></i></span><div><p>Needs review</p><strong>{{ pending_count }}</strong><small>Submitted attempts</small></div></article>
+    <article class="instructor-stat-card"><span class="instructor-stat-icon is-blue" aria-hidden="true"><i class="fa fa-bar-chart"></i></span><div><p>Average score</p><strong>{{ "%.1f"|format(average_score) if average_score is not none else "—" }}</strong><small>{% if average_score is not none %}out of {{ total_points }} points{% else %}Available after grading{% endif %}</small></div></article>
+  </div>
+
+  <section class="instructor-panel report-question-panel">
+    <div class="instructor-panel-heading"><div><h2>Question performance</h2><p>Response accuracy for automatically scored choice questions.</p></div></div>
+    {% if question_stats %}
+    <div class="table-responsive">
+      <table class="table align-middle instructor-table mb-0">
+        <thead><tr><th scope="col">Question</th><th scope="col">Type</th><th scope="col">Responses</th><th scope="col">Correct</th><th scope="col">Accuracy</th></tr></thead>
+        <tbody>
+          {% for item in question_stats %}
+          <tr>
+            <th scope="row" class="report-question-prompt"><span>Q{{ item.question.position }}</span>{{ item.question.prompt }}</th>
+            <td>{{ item.question.question_type.replace("_", " ")|title }}</td>
+            <td>{{ item.answered_count }}</td>
+            <td>{{ item.correct_count if item.correct_percent is not none else "—" }}</td>
+            <td>
+              {% if item.correct_percent is not none %}
+              <span class="accuracy-value">{{ item.correct_percent }}%</span>
+              <div class="accuracy-track" role="img" aria-label="{{ item.correct_percent }} percent correct"><span style="width: {{ item.correct_percent }}%"></span></div>
+              {% else %}<span class="text-body-secondary">Manual grading</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="instructor-empty instructor-empty-compact">
+      <span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-bar-chart"></i></span>
+      <h3>No questions to report</h3>
+      <p class="text-body-secondary">Add questions to see performance here.</p>
+    </div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

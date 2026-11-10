@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Attempts · {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <div class="instructor-breadcrumb">
+    <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">{{ quiz.title }}</a>
+    <i class="fa fa-angle-right" aria-hidden="true"></i>
+    <span>Attempts</span>
+  </div>
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">QUIZ WORKSPACE</p><h1>Student attempts</h1><p class="text-body-secondary mb-0">{{ quiz.title }} · {{ attempts|length }} total</p></div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Back to quiz</a>
+  </header>
+  <nav class="instructor-subnav" aria-label="Quiz workspace">
+    <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Questions</a>
+    <a class="active" href="{{ url_for('main.quiz_attempts', quiz_id=quiz.id) }}" aria-current="page">Attempts <span class="subnav-count">{{ attempts|length }}</span></a>
+    <a href="{{ url_for('main.quiz_report', quiz_id=quiz.id) }}">Reports</a>
+  </nav>
+
+  <section class="instructor-panel">
+    {% if quiz_ended %}
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2" role="status">
+      <span><strong>Quiz ended.</strong> Active attempts are locked and have not been submitted.</span>
+      <form method="post" action="{{ url_for('main.control_quiz_attempts', quiz_id=quiz.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="reopen_quiz">
+          <button class="btn btn-sm btn-outline-primary" type="submit">Reopen quiz</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="attempt-control-bar">
+      <div>
+          <h2>Attempt controls</h2>
+          <p>Locking preserves saved answers but prevents students from continuing or submitting.</p>
+      </div>
+      <div class="attempt-control-actions">
+          <form method="post" action="{{ url_for('main.control_quiz_attempts', quiz_id=quiz.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="lock_all">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Lock all active attempts</button>
+          </form>
+          <form method="post" action="{{ url_for('main.control_quiz_attempts', quiz_id=quiz.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="unlock_all">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Unlock all</button>
+          </form>
+          <form method="post" action="{{ url_for('main.control_quiz_attempts', quiz_id=quiz.id) }}"
+                onsubmit="return confirm('End this quiz for everyone? Active attempts will be locked and left unsubmitted.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="end_quiz">
+            <button class="btn btn-sm btn-outline-danger" type="submit">End quiz for everyone</button>
+          </form>
+      </div>
+    </div>
+    {% endif %}
+    {% if attempts %}
+    <div class="table-responsive">
+      <table class="table align-middle instructor-table mb-0">
+          <thead><tr><th scope="col">Student</th><th scope="col">Attempt</th><th scope="col">Submitted</th><th scope="col">Score</th><th scope="col">Status</th><th scope="col"></th><th scope="col"></th><th scope="col">More access</th></tr></thead>
+          <tbody>
+          {% for attempt, student in attempts %}
+          {% set lock = attempt_locks.get(attempt.id) %}
+          {% set invalidation = invalidations.get(attempt.id) %}
+            <tr>
+            <th scope="row" class="quiz-title-cell"><strong>{{ student.display_name }}</strong><span>{{ student.email }}</span></th>
+            <td>#{{ attempt.attempt_number }}</td>
+            <td>{{ attempt.submitted_at.strftime("%b %d, %Y · %I:%M %p") if attempt.submitted_at else "In progress" }}</td>
+            <td>{{ attempt.score if attempt.score is not none else "—" }}</td>
+            <td>
+              <span class="instructor-status {{ 'is-pending' if invalidation else 'is-published' if attempt.status == 'graded' else 'is-draft' if attempt.status == 'in_progress' else 'is-pending' }}">{{ "Invalidated" if invalidation else "Locked" if lock or quiz_ended else attempt.status.replace("_", " ")|title }}</span>
+              {% if invalidation %}<small class="d-block text-body-secondary">Does not count toward the attempt limit</small>{% endif %}
+              {% if lock and lock.reason == "focus_lost" %}<small class="d-block text-body-secondary">Tab lost focus</small>{% endif %}
+              {% if lock and lock.reason == "saved_progress" %}<small class="d-block text-body-secondary">Saved progress</small>{% endif %}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.review_quiz_attempt', quiz_id=quiz.id, attempt_id=attempt.id) }}">{{ "Review" if attempt.status == "in_progress" else "View / grade" }}</a>
+            </td>
+            <td class="text-end">
+              {% if not invalidation and not quiz_ended and attempt.status == "in_progress" %}
+              <form method="post" action="{{ url_for('main.unlock_quiz_attempt' if lock and lock.reason in ['instructor', 'focus_lost', 'saved_progress'] else 'main.lock_quiz_attempt', quiz_id=quiz.id, attempt_id=attempt.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm {{ 'btn-outline-primary' if lock else 'btn-outline-danger' }}" type="submit">{{ "Unlock" if lock else "Lock" }}</button>
+              </form>
+              {% endif %}
+            </td>
+            <td>
+              {% if not invalidation and quiz.max_attempts is not none %}
+              <small class="d-block text-body-secondary mb-1">Extra attempts granted: {{ attempt_allowances.get(student.id, 0) }}</small>
+              <form method="post" action="{{ url_for('main.grant_quiz_attempt', quiz_id=quiz.id, attempt_id=attempt.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-primary" type="submit">Grant 1 attempt</button>
+              </form>
+              {% endif %}
+              {% if not invalidation %}
+              <form class="mt-1" method="post" action="{{ url_for('main.invalidate_quiz_attempt', quiz_id=quiz.id, attempt_id=attempt.id) }}"
+                    onsubmit="return confirm('Invalidate this attempt? Its answers will be kept for instructor review, but it will no longer count toward the student’s attempt limit.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Invalidate</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="instructor-empty">
+      <span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-inbox"></i></span>
+      <h2>No attempts yet</h2>
+      <p class="text-body-secondary">Student attempts will appear here after they start this quiz.</p>
+    </div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

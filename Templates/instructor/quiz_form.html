@@ -7,7 +7,7 @@
   <div class="mb-4">
     <a href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
     <h1 class="h2 mt-2">{{ "Edit quiz" if quiz else "Create quiz" }}</h1>
-    <p class="text-body-secondary mb-0">Start with a title and an optional description. You can add questions next.</p>
+    <p class="text-body-secondary mb-0">Set up the quiz details and student attempt limits. You can add questions next.</p>
   </div>
 
   {% if error %}
@@ -27,6 +27,73 @@
         <textarea class="form-control" id="description" name="description" rows="3"
                   maxlength="10000">{{ values.description }}</textarea>
       </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="time_limit_minutes">Time limit <span class="text-body-secondary">(optional)</span></label>
+          <div class="input-group">
+            <input class="form-control" id="time_limit_minutes" name="time_limit_minutes"
+                   type="number" min="1" max="10080" step="1"
+                   value="{{ values.time_limit_minutes }}">
+            <span class="input-group-text">minutes</span>
+          </div>
+          <div class="form-text">Leave blank for no time limit.</div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="max_attempts">Attempts allowed <span class="text-body-secondary">(optional)</span></label>
+          <input class="form-control" id="max_attempts" name="max_attempts"
+                 type="number" min="1" step="1" value="{{ values.max_attempts }}">
+          <div class="form-text">Leave blank to allow unlimited attempts.</div>
+        </div>
+      </div>
+      <fieldset class="border rounded-3 p-3">
+        <legend class="float-none w-auto px-2 fs-6 fw-semibold">Availability window</legend>
+        <p class="form-text mt-0">Use your local time. Start is inclusive; the quiz closes at the end time.</p>
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="available_from_local">Opens</label>
+            <input class="form-control" id="available_from_local" type="datetime-local">
+            <input type="hidden" name="available_from" id="available_from"
+                   value="{{ values.available_from }}">
+            <div class="form-text">Leave blank to make it available immediately.</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="available_until_local">Closes</label>
+            <input class="form-control" id="available_until_local" type="datetime-local">
+            <input type="hidden" name="available_until" id="available_until"
+                   value="{{ values.available_until }}">
+            <div class="form-text">Leave blank for no closing time.</div>
+          </div>
+        </div>
+      </fieldset>
+      <div>
+        <label class="form-label" for="password">Quiz password</label>
+        <input class="form-control" id="password" name="password" type="password"
+               maxlength="128" autocomplete="new-password">
+        <div class="form-text">
+          {% if values.has_password %}A password is set. Leave blank to keep it, or enter a new one.{% else %}Optional extra gate for students already assigned through a class.{% endif %}
+        </div>
+        {% if values.has_password %}
+        <div class="form-check mt-2">
+          <input class="form-check-input" id="clear_password" name="clear_password" type="checkbox">
+          <label class="form-check-label" for="clear_password">Remove the current password</label>
+        </div>
+        {% endif %}
+      </div>
+      <div>
+        <label class="form-label" for="interface_theme">Student quiz interface</label>
+        <select class="form-select" id="interface_theme" name="interface_theme">
+          {% for theme, label in quiz_themes.items() %}
+          <option value="{{ theme }}" {% if values.interface_theme == theme %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Choose how the quiz will look to students.</div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" id="exam_mode" name="exam_mode" type="checkbox"
+                 aria-describedby="exam-mode-help" {% if values.exam_mode %}checked{% endif %}>
+          <label class="form-check-label fw-semibold" for="exam_mode">Enable exam mode</label>
+          <div class="form-text" id="exam-mode-help">Hides app navigation and lets students enter full screen. Leaving the tab locks the attempt, and saving progress locks it until you unlock it. These checks cannot prevent switching apps or devices.</div>
+        </div>
+      </div>
       <div>
         <button class="btn btn-primary" type="submit">{{ "Save changes" if quiz else "Create quiz" }}</button>
         <a class="btn btn-outline-secondary" href="{{ url_for('main.instructor_quizzes') }}">Cancel</a>
@@ -34,4 +101,34 @@
     </div>
   </form>
 </section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (() => {
+    const form = document.querySelector("form");
+    const pairs = [
+      ["available_from_local", "available_from"],
+      ["available_until_local", "available_until"],
+    ];
+    for (const [localId, utcId] of pairs) {
+      const local = document.getElementById(localId);
+      const utc = document.getElementById(utcId);
+      if (utc.value) {
+        const date = new Date(utc.value);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        local.value = date.toISOString().slice(0, 16);
+      }
+    }
+    form.addEventListener("submit", () => {
+      for (const [localId, utcId] of pairs) {
+        const local = document.getElementById(localId).value;
+        document.getElementById(utcId).value = local
+          ? new Date(local).toISOString()
+          : "";
+      }
+    });
+  })();
+</script>
 {% endblock %}

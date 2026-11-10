@@ -1,57 +1,91 @@
 {% extends "base.html" %}
 
-{% block title %}My quizzes - Quiz App{% endblock %}
+{% block title %}My quizzes · Quiz App{% endblock %}
 
 {% block content %}
-<section class="container py-4">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<section class="instructor-page container">
+  <div class="instructor-heading">
     <div>
-      <h1 class="h2 mb-1">My quizzes</h1>
-      <p class="text-body-secondary mb-0">Create a quiz and add questions to it.</p>
+      <p class="instructor-eyebrow">INSTRUCTOR WORKSPACE</p>
+      <h1>My quizzes</h1>
+      <p class="text-body-secondary mb-0">Build, organize, and review your assessments.</p>
     </div>
-    <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}">Create quiz</a>
+    <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}">Create a quiz</a>
   </div>
 
-  {% if quizzes %}
-  <div class="table-responsive">
-    <table class="table table-bordered align-middle">
-      <thead>
-        <tr>
-          <th scope="col">Quiz</th>
-          <th scope="col">Questions</th>
-          <th scope="col">Status</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for quiz in quizzes %}
-        <tr>
-          <th scope="row">
-            <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">
-              {{ quiz.title }}
-            </a>
-            {% if quiz.description %}
-            <div class="small text-body-secondary fw-normal">{{ quiz.description }}</div>
-            {% endif %}
-          </th>
-          <td>{{ question_counts.get(quiz.id, 0) }}</td>
-          <td>{{ "Published" if quiz.is_published else "Draft" }}</td>
-          <td class="text-end">
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Open</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card">
-    <div class="card-body">
-      <p class="mb-3">You haven't created a quiz yet.</p>
-      <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}">Create your first quiz</a>
+  <nav class="instructor-subnav" aria-label="Instructor workspace">
+    <a href="{{ url_for('main.instructor_dashboard') }}">Overview</a>
+    <a class="active" href="{{ url_for('main.instructor_quizzes') }}" aria-current="page">Quizzes</a>
+  </nav>
+
+  <div class="instructor-panel">
+    <form class="quiz-filters" method="get">
+      <div class="quiz-search">
+        <label class="visually-hidden" for="quiz-search">Search quizzes</label>
+        <input class="form-control" id="quiz-search" name="q" type="search"
+               value="{{ search }}" placeholder="Search quizzes">
+      </div>
+      <div>
+        <label class="visually-hidden" for="quiz-status">Filter by status</label>
+        <select class="form-select" id="quiz-status" name="status">
+          <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+          <option value="published" {% if status_filter == "published" %}selected{% endif %}>Published</option>
+          <option value="draft" {% if status_filter == "draft" %}selected{% endif %}>Draft</option>
+        </select>
+      </div>
+      <button class="btn btn-outline-secondary" type="submit">Filter</button>
+      {% if search or status_filter %}
+      <a class="btn btn-link" href="{{ url_for('main.instructor_quizzes') }}">Clear</a>
+      {% endif %}
+    </form>
+
+    {% if quizzes %}
+    <div class="table-responsive">
+      <table class="table align-middle instructor-table mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Quiz</th>
+            <th scope="col">Questions</th>
+            <th scope="col">Attempts</th>
+            <th scope="col">Status</th>
+            <th scope="col">Last updated</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for quiz in quizzes %}
+          <tr>
+            <th scope="row" class="quiz-title-cell">
+              <a href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">{{ quiz.title }}</a>
+              <span>{{ quiz.description or "No description" }}</span>
+            </th>
+            <td>{{ question_counts.get(quiz.id, 0) }}</td>
+            <td>{{ attempt_counts.get(quiz.id, 0) }}</td>
+            <td><span class="instructor-status {{ 'is-published' if quiz.is_published else 'is-draft' }}">{{ "Published" if quiz.is_published else "Draft" }}</span></td>
+            <td>{{ quiz.updated_at.strftime("%b %d, %Y") }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{{ url_for('main.instructor_quiz_details', quiz_id=quiz.id) }}">Manage</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+    {% else %}
+    <div class="instructor-empty">
+      <span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-book"></i></span>
+      <h2>{{ "No quizzes match those filters" if search or status_filter else "Start with your first quiz" }}</h2>
+      <p class="text-body-secondary">
+        {{ "Try another search or clear the filters." if search or status_filter else "Create a quiz, add questions, and publish it when it is ready for students." }}
+      </p>
+      {% if search or status_filter %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.instructor_quizzes') }}">Clear filters</a>
+      {% else %}
+      <a class="btn btn-primary" href="{{ url_for('main.create_quiz') }}">Create a quiz</a>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 </section>
 {% endblock %}

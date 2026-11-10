@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+
+{% block title %}Taking {{ quiz.title }} · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container student-take-page theme-{{ interface_theme }}{% if exam_mode %} theme-exam{% endif %}">
+  {% if exam_mode %}
+  <div class="exam-mode-banner alert alert-info">
+    <strong>Exam mode</strong>
+    <span>Leaving this tab or switching windows locks your attempt until your instructor unlocks it.</span>
+  </div>
+  <div class="exam-start-panel instructor-panel" id="exam-start-panel">
+    <h2>Exam mode</h2>
+    <p id="exam-mode-message">{% if attempt_paused %}The quiz is paused. Enter full screen to continue.{% else %}Your answers save as you work. Enter full screen to start.{% endif %}</p>
+    <button class="btn btn-primary" id="begin-exam-mode" type="button">Continue in full screen</button>
+  </div>
+  <div class="exam-loading-screen" id="exam-loading-screen" role="status" aria-live="polite" hidden>
+    <span class="exam-loading-spinner" aria-hidden="true"></span>
+    <span id="exam-loading-message">Preparing exam mode...</span>
+  </div>
+  <div class="alert alert-warning exam-mode-warning" id="exam-mode-warning" role="alert" hidden></div>
+  <noscript>
+    <div class="alert alert-warning" role="alert">This quiz requires JavaScript to check full-screen state. Enable JavaScript to continue.</div>
+  </noscript>
+  <div id="quiz-content"{% if exam_mode %} hidden{% endif %}>
+  {% endif %}
+  <div class="student-take-heading">
+    <div><p class="instructor-eyebrow">QUIZ ATTEMPT #{{ attempt.attempt_number }}</p><h1>{{ quiz.title }}</h1><p class="text-body-secondary mb-0">{{ quiz.questions|length }} questions · Started {{ attempt.started_at.strftime("%b %d, %Y · %I:%M %p") }}</p></div>
+    {% if remaining_seconds is not none %}
+    <div class="student-timer" data-remaining-seconds="{{ remaining_seconds }}"><i class="fa fa-clock-o" aria-hidden="true"></i><span id="quiz-countdown">--:--</span><small>remaining</small></div>
+    {% endif %}
+  </div>
+  <form method="post" id="quiz-attempt-form" action="{{ url_for('main.submit_quiz_attempt', attempt_id=attempt.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="student-question-list">
+      {% set question_counter = namespace(value=0) %}
+      {% for section, questions in question_groups %}
+      {% set group_index = loop.index0 %}
+      <section class="student-question-group" data-question-group="{{ group_index }}">
+        {% if section %}
+        <header class="student-section-heading">
+          <span>SECTION {{ section.position }}</span>
+          <h2>{{ section.title }}</h2>
+        </header>
+        {% endif %}
+      {% for question in questions %}
+      {% set answer = answers.get(question.id) %}
+      <article class="instructor-panel student-question-card"
+               data-question-step="{{ question_counter.value }}"
+               data-question-group="{{ group_index }}">
+        <div class="student-question-number">Question {{ question.position }} <span>{{ question.points }} pts</span></div>
+        <h2>{{ question.prompt }}</h2>
+        {% if question.question_type in ["single_choice", "true_false"] %}
+        <div class="student-answer-options">
+          {% for option in question.options %}
+          <label class="student-answer-option">
+            <input type="radio" name="answer_{{ question.id }}" value="{{ option.id }}"
+                   {% if answer and answer.selected_option_id == option.id %}checked{% endif %}>
+            <span>{{ option.text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <label class="form-label" for="answer_{{ question.id }}">Your response</label>
+        <textarea class="form-control" id="answer_{{ question.id }}" name="answer_{{ question.id }}"
+                  rows="4" maxlength="5000" placeholder="Type your answer here...">{{ answer.response_text if answer else "" }}</textarea>
+        {% endif %}
+      </article>
+      {% set question_counter.value = question_counter.value + 1 %}
+      {% endfor %}
+      </section>
+      {% endfor %}
+    </div>
+    <div class="focus-question-controls" id="focus-question-controls" hidden>
+      <button class="btn btn-outline-secondary" type="button" id="previous-question">Previous</button>
+      <span id="focus-question-progress" aria-live="polite"></span>
+      <button class="btn btn-outline-primary" type="button" id="next-question">Next question</button>
+    </div>
+    <p class="attempt-save-status" id="attempt-save-status" role="status" aria-live="polite"></p>
+    <footer class="student-submit-bar">
+      <span class="text-body-secondary">Review your answers before submitting.</span>
+      <div>
+        <button class="btn btn-outline-secondary" type="submit"
+                name="save_progress" value="1"
+                formaction="{{ url_for('main.save_quiz_answer', attempt_id=attempt.id) }}">Save progress</button>
+        <button class="btn btn-primary" type="submit"
+                        {% if not exam_mode %}onclick="return confirm('Submit this quiz? You will not be able to change your answers afterward.');"{% endif %}>Submit quiz</button>
+      </div>
+    </footer>
+  </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (() => {
+    const timer = document.querySelector(".student-timer");
+    if (!timer) {
+      window.quizAttemptTimer = { start() {}, pause() {}, resume() {} };
+      return;
+    }
+
+    const display = document.querySelector("#quiz-countdown");
+    const form = document.querySelector("#quiz-attempt-form");
+    let remaining = Number(timer.dataset.remainingSeconds);
+    let lastStartedAt = 0;
+    let intervalId;
+
+    const render = () => {
+      const totalSeconds = Math.ceil(Math.max(0, remaining));
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const visibleParts = [];
+      const spokenParts = [];
+      if (hours) {
+        visibleParts.push(`${hours}h`);
+        spokenParts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+      }
+      if (minutes || hours) {
+        visibleParts.push(`${minutes}m`);
+        spokenParts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+      }
+      visibleParts.push(`${seconds}s`);
+      spokenParts.push(`${seconds} second${seconds === 1 ? "" : "s"}`);
+      display.textContent = visibleParts.join(" ");
+      display.setAttribute("aria-label", `${spokenParts.join(", ")} remaining`);
+    };
+
+    const pause = () => {
+      if (intervalId === undefined) return;
+      remaining = Math.max(
+        0,
+        remaining - (performance.now() - lastStartedAt) / 1000,
+      );
+      window.clearInterval(intervalId);
+      intervalId = undefined;
+      render();
+    };
+
+    const start = (seconds) => {
+      pause();
+      if (seconds === null) return;
+      if (seconds !== undefined) {
+        remaining = Math.max(0, Number(seconds));
+      }
+      render();
+      lastStartedAt = performance.now();
+      intervalId = window.setInterval(() => {
+        const elapsed = (performance.now() - lastStartedAt) / 1000;
+        if (elapsed < 1) return;
+        remaining = Math.max(0, remaining - elapsed);
+        lastStartedAt = performance.now();
+        render();
+        if (remaining <= 0) {
+          pause();
+          form.requestSubmit(
+            form.querySelector('button[type="submit"]:not([formaction])'),
+          );
+        }
+      }, 200);
+    };
+
+    window.quizAttemptTimer = { start, pause, resume: () => start() };
+    if (!{{ "true" if exam_mode else "false" }}) {
+      start(remaining);
+    }
+  })();
+</script>
+<script>
+  (() => {
+    const form = document.querySelector("#quiz-attempt-form");
+    const questions = [...form.querySelectorAll("[data-question-step]")];
+    const controls = document.querySelector("#focus-question-controls");
+    const previous = document.querySelector("#previous-question");
+    const next = document.querySelector("#next-question");
+    const progress = document.querySelector("#focus-question-progress");
+    const status = document.querySelector("#attempt-save-status");
+    let activeQuestion = 0;
+    let reviewing = false;
+    let saveTimer;
+
+    const groups = [...form.querySelectorAll("[data-question-group].student-question-group")];
+    if (document.querySelector(".theme-focus") && questions.length > 1) {
+      controls.hidden = false;
+      form.classList.add("is-focus-mode");
+      const showQuestion = (index) => {
+        activeQuestion = index;
+        reviewing = false;
+        questions.forEach((question, questionIndex) => {
+          question.hidden = questionIndex !== activeQuestion;
+        });
+        groups.forEach((group) => {
+          group.hidden = Number(group.dataset.questionGroup) !== Number(
+            questions[activeQuestion].dataset.questionGroup,
+          );
+        });
+        previous.textContent = "Previous";
+        previous.disabled = activeQuestion === 0;
+        next.hidden = false;
+        next.textContent = activeQuestion === questions.length - 1
+          ? "Review answers"
+          : "Next question";
+        progress.textContent = `Question ${activeQuestion + 1} of ${questions.length}`;
+      };
+      previous.addEventListener("click", () => {
+        showQuestion(reviewing ? questions.length - 1 : activeQuestion - 1);
+      });
+      next.addEventListener("click", () => {
+        if (activeQuestion === questions.length - 1) {
+          reviewing = true;
+          questions.forEach((question) => { question.hidden = false; });
+          groups.forEach((group) => { group.hidden = false; });
+          progress.textContent = "Review your answers";
+          previous.textContent = "Back to questions";
+          previous.disabled = false;
+          next.hidden = true;
+          return;
+        }
+        showQuestion(activeQuestion + 1);
+      });
+      showQuestion(0);
+    }
+
+    const saveProgress = async () => {
+      status.textContent = "Saving…";
+      try {
+        const response = await fetch(
+          "{{ url_for('main.save_quiz_answer', attempt_id=attempt.id) }}",
+          {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          },
+        );
+        if (!response.ok) {
+          throw new Error(`Save failed (${response.status}).`);
+        }
+        if (new URL(response.url).pathname.endsWith("/result")) {
+          window.location.assign(response.url);
+          return;
+        }
+        status.textContent = "All changes saved.";
+      } catch (error) {
+        status.textContent = `${error.message} Please use Save progress to retry.`;
+      }
+    };
+
+    form.addEventListener("input", () => {
+      status.textContent = "Unsaved changes";
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(saveProgress, 500);
+    });
+    form.addEventListener("submit", () => window.clearTimeout(saveTimer));
+  })();
+</script>
+{% if exam_mode %}
+<script>
+  (() => {
+    const page = document.querySelector(".student-take-page");
+    const begin = document.querySelector("#begin-exam-mode");
+    const startPanel = document.querySelector("#exam-start-panel");
+    const message = document.querySelector("#exam-mode-message");
+    const content = document.querySelector("#quiz-content");
+    const loadingScreen = document.querySelector("#exam-loading-screen");
+    const loadingMessage = document.querySelector("#exam-loading-message");
+    const warning = document.querySelector("#exam-mode-warning");
+    const banner = document.querySelector(".exam-mode-banner");
+    const form = document.querySelector("#quiz-attempt-form");
+    const submitButton = form.querySelector('button[type="submit"]:not([formaction])');
+    const csrfToken = form.elements.csrf_token.value;
+    let wasFullscreen = document.fullscreenElement === page;
+    let transition = Promise.resolve();
+    let warningCount = 0;
+    let focusMonitoring = false;
+    let focusLost = false;
+    let submissionConfirmationOpen = false;
+    let submissionInProgress = false;
+
+    const waitForMinimumLoadingTime = async (startedAt) => {
+      const remainingDisplayTime = 4000 - (performance.now() - startedAt);
+      if (remainingDisplayTime > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remainingDisplayTime));
+      }
+    };
+
+    const showWarning = (warningMessage) => {
+      if (document.fullscreenElement === page) return;
+      warningCount += 1;
+      warning.hidden = false;
+      warning.textContent = `Focus warning ${warningCount}: ${warningMessage}`;
+    };
+
+    const resumeAttempt = async () => {
+      const loadingStartedAt = performance.now();
+      loadingMessage.textContent = "Preparing exam mode...";
+      loadingScreen.hidden = false;
+      try {
+        const response = await fetch(
+          "{{ url_for('main.resume_exam_attempt', attempt_id=attempt.id) }}",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "X-CSRF-Token": csrfToken,
+            },
+            body: new URLSearchParams({ csrf_token: csrfToken }),
+          },
+        );
+        const result = await response.json();
+        if (result.result_url) {
+          window.location.assign(result.result_url);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Could not resume the quiz. Reload the page to try again.");
+        }
+        if (focusLost) return;
+        warning.hidden = true;
+        banner.hidden = true;
+        startPanel.hidden = true;
+        content.hidden = false;
+        focusMonitoring = true;
+        window.quizAttemptTimer.start(result.remaining_seconds);
+      } finally {
+        await waitForMinimumLoadingTime(loadingStartedAt);
+        if (!submissionInProgress) loadingScreen.hidden = true;
+      }
+    };
+
+    const lockForFocusLoss = async () => {
+      if (!focusMonitoring || focusLost || submissionInProgress) return;
+      focusLost = true;
+      focusMonitoring = false;
+      window.quizAttemptTimer.pause();
+      loadingScreen.hidden = true;
+      content.hidden = true;
+      startPanel.hidden = false;
+      begin.hidden = true;
+      warning.hidden = true;
+      message.textContent = "This attempt is locked because the quiz tab lost focus. Your answers are being saved. Contact your instructor to unlock it.";
+      try {
+        const response = await fetch(
+          "{{ url_for('main.lock_attempt_on_focus_loss', attempt_id=attempt.id) }}",
+          {
+            method: "POST",
+            body: new FormData(form),
+          },
+        );
+        const result = await response.json();
+        if (result.result_url) {
+          window.location.assign(result.result_url);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("The lock could not be confirmed by the server.");
+        }
+        message.textContent = "This attempt is locked because the quiz tab lost focus. Your answers are saved. Contact your instructor to unlock it.";
+      } catch (error) {
+        message.textContent = `${error.message} Keep this page open and contact your instructor.`;
+      }
+    };
+
+    const pauseAttempt = async () => {
+      if (submissionInProgress) return;
+      window.quizAttemptTimer.pause();
+      content.hidden = true;
+      startPanel.hidden = false;
+      message.textContent = "The quiz is paused. Return to full screen to continue.";
+      begin.disabled = false;
+      begin.textContent = "Return to full screen";
+      warning.hidden = true;
+      banner.hidden = false;
+      try {
+        const response = await fetch(
+          "{{ url_for('main.pause_exam_attempt', attempt_id=attempt.id) }}",
+          {
+            method: "POST",
+            body: new FormData(form),
+          },
+        );
+        const result = await response.json();
+        if (result.result_url) {
+          window.location.assign(result.result_url);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Could not pause the quiz. Reload the page to check its status.");
+        }
+      } catch (error) {
+        showWarning(error.message);
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      const isFullscreen = document.fullscreenElement === page;
+      if (isFullscreen === wasFullscreen) return;
+      wasFullscreen = isFullscreen;
+      if (submissionConfirmationOpen || submissionInProgress) return;
+      begin.disabled = true;
+      if (isFullscreen) focusMonitoring = true;
+      transition = transition.then(async () => {
+        if (isFullscreen) {
+          try {
+            await resumeAttempt();
+          } catch (error) {
+            begin.disabled = false;
+            showWarning(error.message);
+          }
+        } else {
+          await pauseAttempt();
+        }
+      });
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    begin.addEventListener("click", async () => {
+      begin.disabled = true;
+      try {
+        await page.requestFullscreen();
+      } catch (error) {
+        begin.disabled = false;
+        showWarning(
+          error.name === "TypeError"
+            ? "Full-screen mode is not available in this browser."
+            : "Full-screen mode could not be opened.",
+        );
+      }
+    });
+
+    submitButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (submissionConfirmationOpen || submissionInProgress) return;
+      submissionConfirmationOpen = true;
+      const shouldResumeFocusMonitoring = focusMonitoring;
+      focusMonitoring = false;
+      const confirmed = window.confirm(
+        "Submit this quiz? You will not be able to change your answers afterward.",
+      );
+      submissionConfirmationOpen = false;
+      if (!confirmed) {
+        focusMonitoring = (
+          shouldResumeFocusMonitoring
+          && document.fullscreenElement === page
+          && !focusLost
+        );
+        if (document.fullscreenElement !== page) {
+          await pauseAttempt();
+        }
+        return;
+      }
+      form.requestSubmit(submitButton);
+    });
+
+    form.addEventListener("submit", async (event) => {
+      if (event.submitter?.hasAttribute("formaction")) return;
+      event.preventDefault();
+      if (submissionInProgress) return;
+
+      submissionInProgress = true;
+      focusMonitoring = false;
+      window.quizAttemptTimer.pause();
+      submitButton.disabled = true;
+      content.hidden = true;
+      startPanel.hidden = true;
+      warning.hidden = true;
+      loadingMessage.textContent = "Submitting exam and processing results...";
+      loadingScreen.hidden = false;
+
+      const loadingStartedAt = performance.now();
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        const destination = new URL(response.url, window.location.href);
+        if (response.redirected) {
+          await waitForMinimumLoadingTime(loadingStartedAt);
+          window.location.assign(destination.href);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("The quiz could not be submitted. Please try again.");
+        }
+        throw new Error("The quiz submission response was incomplete. Please try again.");
+      } catch (error) {
+        await waitForMinimumLoadingTime(loadingStartedAt);
+        submissionInProgress = false;
+        loadingScreen.hidden = true;
+        content.hidden = false;
+        submitButton.disabled = false;
+        focusMonitoring = document.fullscreenElement === page && !focusLost;
+        warning.hidden = false;
+        warning.textContent = error.message;
+        window.quizAttemptTimer.resume();
+      }
+    });
+
+    window.addEventListener("blur", lockForFocusLoss);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) lockForFocusLoss();
+    });
+
+    if (wasFullscreen) {
+      begin.disabled = true;
+      focusMonitoring = true;
+      resumeAttempt().catch((error) => showWarning(error.message));
+    }
+  })();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Learning · Quiz App{% endblock %}
+
+{% block content %}
+<section class="instructor-page container">
+  <header class="instructor-heading">
+    <div><p class="instructor-eyebrow">MY LEARNING</p><h1>Welcome back, {{ current_user.display_name }}</h1><p class="text-body-secondary mb-0">Pick up where you left off or explore an available quiz.</p></div>
+    <a class="btn btn-primary" href="{{ url_for('main.available_quizzes') }}">Browse quizzes</a>
+  </header>
+  <nav class="instructor-subnav" aria-label="Learning workspace">
+    <a class="active" href="{{ url_for('main.student_dashboard') }}" aria-current="page">Overview</a>
+    <a href="{{ url_for('main.available_quizzes') }}">Available quizzes</a>
+  </nav>
+  <div class="instructor-content-grid">
+    <section class="instructor-panel">
+      <div class="instructor-panel-heading"><div><h2>Recent activity</h2><p>Your latest quiz attempts.</p></div></div>
+      {% if attempts %}
+      <div class="instructor-recent-list">
+        {% for attempt in attempts %}
+        {% set quiz = quizzes_by_id.get(attempt.quiz_id) %}
+        <a class="instructor-recent-item" href="{{ url_for('main.take_quiz_attempt', attempt_id=attempt.id) if attempt.status == 'in_progress' else url_for('main.quiz_attempt_result', attempt_id=attempt.id) }}">
+          <span class="instructor-quiz-mark" aria-hidden="true"><i class="fa fa-file-text-o"></i></span>
+          <span class="instructor-recent-copy"><strong>{{ quiz.title if quiz else "Quiz" }}</strong><small>Attempt #{{ attempt.attempt_number }} · {{ attempt.started_at.strftime("%b %d, %Y") }}{% if attempt.score is not none %} · Score {{ attempt.score }}{% endif %}</small></span>
+          <span class="instructor-status {{ 'is-published' if attempt.status == 'graded' else 'is-draft' if attempt.status == 'in_progress' else 'is-pending' }}">{{ attempt.status.replace("_", " ")|title }}</span>
+          <i class="fa fa-angle-right instructor-chevron" aria-hidden="true"></i>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="instructor-empty instructor-empty-compact"><span class="instructor-empty-icon" aria-hidden="true"><i class="fa fa-inbox"></i></span><h3>No activity yet</h3><p class="text-body-secondary">Start an available quiz and your attempts will show up here.</p><a class="btn btn-primary" href="{{ url_for('main.available_quizzes') }}">Browse quizzes</a></div>
+      {% endif %}
+    </section>
+    <aside class="instructor-panel">
+      <div class="instructor-panel-heading"><div><h2>Recently published</h2><p>Quizzes ready to take.</p></div><a href="{{ url_for('main.available_quizzes') }}">Browse all</a></div>
+      {% if published_quizzes %}
+      <div class="quiz-action-list">
+        {% for quiz in published_quizzes %}
+        <a href="{{ url_for('main.quiz_details', quiz_id=quiz.id) }}"><i class="fa fa-file-text-o" aria-hidden="true"></i><span><strong>{{ quiz.title }}</strong><small>{{ quiz.questions|length }} questions{% if quiz.time_limit_seconds %} · {{ quiz.time_limit_seconds // 60 }} min{% endif %}</small></span><i class="fa fa-angle-right" aria-hidden="true"></i></a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-body-secondary small mb-0">There are no published quizzes yet.</p>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

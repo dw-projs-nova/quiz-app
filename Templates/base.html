@@ -97,14 +97,14 @@
         <!-- font awesome  4.7.0 -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   </head>
-  <body>
+  <body{% if exam_mode|default(false) %} class="exam-mode-shell"{% endif %}>
+      {% if not exam_mode|default(false) %}
       {% block navigation %}
-      <nav class="navbar navbar-expand-lg"
-           style="background-color: var(--bs-content-bg); border-bottom: var(--bs-border-width) solid var(--bs-content-border-color);"
-           aria-label="Main navigation">
+      <nav class="navbar navbar-expand-lg site-navbar" aria-label="Main navigation">
         <div class="container">
-          <a class="navbar-brand" href="{{ url_for('main.account') if current_user else url_for('main.login') }}">
-            Quiz App
+          <a class="navbar-brand site-brand" href="{{ url_for('main.instructor_dashboard') if current_user and has_permission('quiz.manage_own') else url_for('main.student_dashboard') if current_user and has_permission('quiz.take') else url_for('main.login') }}">
+            <span class="site-brand-mark" aria-hidden="true"><i class="fa fa-check"></i></span>
+            <span>Quiz App</span>
           </a>
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                   data-bs-target="#main-navigation" aria-controls="main-navigation"
@@ -116,28 +116,34 @@
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
               {% if current_user %}
               <li class="nav-item">
-                <a class="nav-link{% if request.endpoint == 'main.account' %} active{% endif %}"
-                   {% if request.endpoint == 'main.account' %}aria-current="page"{% endif %}
-                   href="{{ url_for('main.account') }}">Account</a>
+                <a class="nav-link{% if request.endpoint in ['main.student_dashboard', 'main.available_quizzes', 'main.quiz_details', 'main.start_quiz_attempt', 'main.take_quiz_attempt', 'main.save_quiz_answer', 'main.submit_quiz_attempt', 'main.quiz_attempt_result'] %} active{% endif %}"
+                   {% if request.endpoint in ['main.student_dashboard', 'main.available_quizzes', 'main.quiz_details', 'main.start_quiz_attempt', 'main.take_quiz_attempt', 'main.save_quiz_answer', 'main.submit_quiz_attempt', 'main.quiz_attempt_result'] %}aria-current="page"{% endif %}
+                   href="{{ url_for('main.available_quizzes') }}">Quizzes</a>
               </li>
-              {% if has_permission('quiz.manage_own') %}
+              {% if current_user.role == "student" %}
               <li class="nav-item">
-                <a class="nav-link{% if request.endpoint and request.endpoint.startswith('main.instructor_') or request.endpoint in ['main.create_quiz', 'main.edit_quiz', 'main.create_quiz_question'] %} active{% endif %}"
-                   href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a>
+                <a class="nav-link{% if request.endpoint in ['main.student_classes', 'main.join_class'] %} active{% endif %}"
+                   href="{{ url_for('main.student_classes') }}">My classes</a>
               </li>
               {% endif %}
-              {% if has_permission('users.manage') %}
-              <li class="nav-item">
-                <a class="nav-link{% if request.endpoint == 'main.admin_users' %} active{% endif %}"
-                   {% if request.endpoint == 'main.admin_users' %}aria-current="page"{% endif %}
-                   href="{{ url_for('main.admin_users') }}">Manage users</a>
+              {% if has_permission('quiz.manage_own') %}
+              <li class="nav-item dropdown">
+                <button class="nav-link dropdown-toggle{% if request.endpoint and request.endpoint.startswith('main.instructor_') or request.endpoint in ['main.create_quiz', 'main.edit_quiz', 'main.create_quiz_question', 'main.edit_quiz_question', 'main.delete_quiz_question', 'main.move_quiz_question', 'main.publish_quiz', 'main.delete_quiz', 'main.quiz_attempts', 'main.quiz_report', 'main.review_quiz_attempt', 'main.grade_quiz_attempt'] %} active{% endif %}"
+                        type="button" data-bs-toggle="dropdown" aria-expanded="false">Teaching</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{{ url_for('main.instructor_dashboard') }}">Overview</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('main.instructor_quizzes') }}">My quizzes</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('main.instructor_classes') }}">Classes</a></li>
+                </ul>
               </li>
               {% endif %}
               {% if has_permission('quiz.manage_all') %}
-              <li class="nav-item">
-                <a class="nav-link{% if request.endpoint == 'quiz_admin.index' or request.endpoint and request.endpoint.startswith(('admin_users_data.', 'admin_quizzes_data.', 'admin_questions_data.', 'admin_attempts_data.', 'admin_answers_data.')) %} active{% endif %}"
-                   {% if request.endpoint == 'quiz_admin.index' %}aria-current="page"{% endif %}
-                   href="{{ url_for('quiz_admin.index') }}">Admin dashboard</a>
+              <li class="nav-item dropdown">
+                <button class="nav-link dropdown-toggle{% if request.endpoint == 'quiz_admin.index' or request.endpoint and request.endpoint.startswith(('admin_users_data.', 'admin_quizzes_data.', 'admin_questions_data.', 'admin_attempts_data.', 'admin_answers_data.')) %} active{% endif %}"
+                        type="button" data-bs-toggle="dropdown" aria-expanded="false">Administration</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{{ url_for('quiz_admin.index') }}">Admin backend</a></li>
+                </ul>
               </li>
               {% endif %}
               {% endif %}
@@ -146,18 +152,13 @@
             <ul class="navbar-nav align-items-lg-center">
               {% if current_user %}
               <li class="nav-item dropdown">
-                <button class="nav-link dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="nav-link dropdown-toggle site-account-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
                   <span class="account-avatar" aria-hidden="true">{{ current_user.display_name[:1]|upper }}</span>
-                  <span>{{ current_user.display_name }}</span>
-                  <span class="badge text-bg-secondary">{{ role_labels.get(current_user.role, current_user.role) }}</span>
+                  <span class="site-account-copy"><strong>{{ current_user.display_name }}</strong><small>{{ role_labels.get(current_user.role, current_user.role) }}</small></span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                  {% if has_permission('quiz.manage_all') %}
-                  <li>
-                    <a class="dropdown-item" href="{{ url_for('quiz_admin.index') }}">Admin dashboard</a>
-                  </li>
-                  {% endif %}
+                  <li><a class="dropdown-item" href="{{ url_for('main.account') }}">My account</a></li>
                   <li>
                     <form method="post" action="{{ url_for('main.logout') }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -216,7 +217,22 @@
         </div>
       </nav>
       {% endblock %}
-    <main>{% block content %}{% endblock %}</main>
+      {% endif %}
+    <main>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container pt-3" aria-live="polite">
+          {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
     {% block scripts %}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha256-CDOy6cOibCWEdsRiZuaHf8dSGGJRYuBGC+mjoJimHGw=" crossorigin="anonymous"></script>
     {% endblock %}
